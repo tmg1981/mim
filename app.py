@@ -5,8 +5,6 @@ import threading
 import json
 import os
 from dotenv import load_dotenv
-import pytz
-from datetime import datetime
 
 load_dotenv()
 
@@ -15,20 +13,17 @@ CHAT_ID = int(os.getenv('CHAT_ID'))
 
 app = Flask(__name__)
 
-# تنظیمات API
 base_url = 'https://api.geckoterminal.com/api/v2'
 networks = ['solana', 'base', 'arbitrum']
 
-# فیلترها
 min_market_cap = 500000
 min_volume_24h = 1000000
 min_price_change_5m = 5
-max_age_minutes = 120  # توکن تازه‌لانچ‌شده
+max_age_minutes = 120
 min_liquidity = 90000
 min_liq_to_cap_ratio = 0.3
 max_total_supply = 1_000_000_000
 
-# کش دیتا
 DATA_CACHE = []
 last_updated = None
 WATCHLIST_FILE = 'watchlist.json'
@@ -85,7 +80,6 @@ def fetch_data():
                 token_name = base_token.get('name')
                 token_symbol = base_token.get('symbol')
 
-                # فیلترهای اولیه
                 if (not token_name or not token_symbol or
                     market_cap < min_market_cap or
                     liquidity < min_liquidity or
@@ -109,7 +103,6 @@ def fetch_data():
                 top_holder_percent = float(holders[0]['attributes']['percentage']) if holders else 0
                 top_holder_label = holders[0]['attributes'].get('label', '') if holders else ''
 
-                # بررسی ریسک‌ها
                 risk_notes = []
                 if top_10_percent > 25:
                     risk_notes.append("Top 10 > 25%")
@@ -139,10 +132,8 @@ def fetch_data():
                 DATA_CACHE.append(token_data)
         except Exception as e:
             print(f"خطا در پردازش شبکه {network}: {e}")
-
-    # تنظیم timezone تهران و زمان آخرین آپدیت
-    tehran_tz = pytz.timezone('Asia/Tehran')
-    last_updated = datetime.now(tehran_tz).strftime('%Y-%m-%d %H:%M:%S')
+    last_updated = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+    print(f"Fetched {len(DATA_CACHE)} tokens at {last_updated}")
 
 def auto_fetch():
     while True:
@@ -192,5 +183,4 @@ def add_to_watchlist():
 if __name__ == '__main__':
     threading.Thread(target=auto_fetch, daemon=True).start()
     threading.Thread(target=auto_telegram, daemon=True).start()
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
