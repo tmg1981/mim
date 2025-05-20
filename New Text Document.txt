@@ -1,0 +1,13 @@
+import requests
+
+TELEGRAM_TOKEN = '7672274033:AAET9Jpt34MQwnCnzruGeqV6_AkBQcJ7biI'
+CHAT_ID = 123456789  # عددی که از @userinfobot گرفتی
+
+def send_telegram_message(message):
+    url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
+    data = {'chat_id': CHAT_ID, 'text': message}
+    response = requests.post(url, data=data)
+    print(f"📤 وضعیت ارسال: {response.status_code}, پاسخ: {response.text}")
+
+print("✅ شروع تست ارسال پیام...")
+send_telegram_message("📬 این یک پیام تستی است از ربات Gecko.")

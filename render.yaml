@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: meme-coin-dashboard
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn app:app
+    envVars:
+      - key: TELEGRAM_TOKEN
+        value: your_real_token_here
+      - key: CHAT_ID
+        value: your_chat_id_here

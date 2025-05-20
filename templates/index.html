@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>📊 Meme Coin Dashboard</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f8f8f8;
+            padding: 20px;
+        }
+        .token {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 0 5px #ccc;
+        }
+        button {
+            padding: 6px 10px;
+            background: #2d89ef;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .info {
+            font-size: 14px;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Meme Coin Dashboard</h1>
+    <p>🕒 آخرین بروزرسانی: {{ last_updated or "در حال بارگذاری..." }}</p>
+    {% for token in tokens %}
+        <div class="token">
+            <b>{{ token.token_name }} ({{ token.token_symbol }})</b> | شبکه: {{ token.network }}
+            <div class="info">
+                💰 Liquidity: ${{ '{:,.0f}'.format(token.liquidity) }}<br>
+                📈 Market Cap: ${{ '{:,.0f}'.format(token.market_cap) }}<br>
+                ⏱ Age: {{ token.age }} mins<br>
+                📊 Volume 24h: ${{ '{:,.0f}'.format(token.volume_24h) }}<br>
+                📉 5m Change: {{ token.price_change_5m }}%<br>
+                🔗 Token: <code>{{ token.address }}</code><br>
+                🚨 Risks: {{ token.risks | join(', ') if token.risks else 'None' }}
+            </div>
+            <button onclick="addToWatchlist('{{ token.address }}')">➕ افزودن به واچ لیست</button>
+        </div>
+    {% endfor %}
+
+    <script>
+        function addToWatchlist(address) {
+            fetch('/watchlist', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({address})
+            }).then(res => {
+                if (res.ok) alert("به واچ لیست اضافه شد!");
+            });
+        }
+    </script>
+</body>
+</html>
