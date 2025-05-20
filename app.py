@@ -5,8 +5,8 @@ import threading
 import json
 import os
 from dotenv import load_dotenv
-import datetime
 import pytz
+from datetime import datetime
 
 load_dotenv()
 
@@ -140,10 +140,9 @@ def fetch_data():
         except Exception as e:
             print(f"خطا در پردازش شبکه {network}: {e}")
 
-    # تغییر این بخش برای استفاده از منطقه زمانی تهران
+    # تنظیم timezone تهران و زمان آخرین آپدیت
     tehran_tz = pytz.timezone('Asia/Tehran')
-    now_tehran = datetime.datetime.now(tehran_tz)
-    last_updated = now_tehran.strftime('%Y-%m-%d %H:%M:%S')
+    last_updated = datetime.now(tehran_tz).strftime('%Y-%m-%d %H:%M:%S')
 
 def auto_fetch():
     while True:
@@ -193,4 +192,5 @@ def add_to_watchlist():
 if __name__ == '__main__':
     threading.Thread(target=auto_fetch, daemon=True).start()
     threading.Thread(target=auto_telegram, daemon=True).start()
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port, debug=True)
