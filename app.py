@@ -187,5 +187,5 @@ def add_to_watchlist():
 if __name__ == '__main__':
     threading.Thread(target=auto_fetch, daemon=True).start()
     threading.Thread(target=auto_telegram, daemon=True).start()
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
