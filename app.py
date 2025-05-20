@@ -4,14 +4,12 @@ import time
 import threading
 import json
 import os
-import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = int(os.getenv('CHAT_ID'))
-
 
 app = Flask(__name__)
 
@@ -27,7 +25,6 @@ max_age_minutes = 120  # توکن تازه‌لانچ‌شده
 min_liquidity = 90000
 min_liq_to_cap_ratio = 0.3
 max_total_supply = 1_000_000_000
-
 
 # کش دیتا
 DATA_CACHE = []
@@ -190,4 +187,5 @@ def add_to_watchlist():
 if __name__ == '__main__':
     threading.Thread(target=auto_fetch, daemon=True).start()
     threading.Thread(target=auto_telegram, daemon=True).start()
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
