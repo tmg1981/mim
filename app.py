@@ -13,7 +13,7 @@ CHAT_ID = int(os.getenv('CHAT_ID'))
 
 app = Flask(__name__)
 
-# تنظیمات API
+# API تنظیمات
 base_url = 'https://api.geckoterminal.com/api/v2'
 networks = ['solana', 'base', 'arbitrum']
 
@@ -21,15 +21,15 @@ networks = ['solana', 'base', 'arbitrum']
 min_market_cap = 500000
 min_volume_24h = 1000000
 min_price_change_5m = 5
-max_age_minutes = 120  # توکن تازه‌لانچ‌شده
+max_age_minutes = 120
 min_liquidity = 90000
 min_liq_to_cap_ratio = 0.3
 max_total_supply = 1_000_000_000
 
-# کش دیتا
 DATA_CACHE = []
 last_updated = None
 WATCHLIST_FILE = 'watchlist.json'
+
 if not os.path.exists(WATCHLIST_FILE):
     with open(WATCHLIST_FILE, 'w') as f:
         json.dump([], f)
@@ -83,7 +83,6 @@ def fetch_data():
                 token_name = base_token.get('name')
                 token_symbol = base_token.get('symbol')
 
-                # فیلترهای اولیه
                 if (not token_name or not token_symbol or
                     market_cap < min_market_cap or
                     liquidity < min_liquidity or
@@ -107,7 +106,6 @@ def fetch_data():
                 top_holder_percent = float(holders[0]['attributes']['percentage']) if holders else 0
                 top_holder_label = holders[0]['attributes'].get('label', '') if holders else ''
 
-                # بررسی ریسک‌ها
                 risk_notes = []
                 if top_10_percent > 25:
                     risk_notes.append("Top 10 > 25%")
@@ -137,6 +135,7 @@ def fetch_data():
                 DATA_CACHE.append(token_data)
         except Exception as e:
             print(f"خطا در پردازش شبکه {network}: {e}")
+
     last_updated = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
 
 def auto_fetch():
@@ -170,7 +169,6 @@ def auto_telegram():
 
 @app.route('/')
 def index():
-    # اضافه کردن توکن تستی برای تست UI و دکمه‌ها
     test_token = {
         'network': 'testnet',
         'token_name': 'توکن تستی',
@@ -185,10 +183,10 @@ def index():
         'risks': []
     }
 
-    tokens_with_test = DATA_CACHE.copy()
-    tokens_with_test.insert(0, test_token)  # توکن تستی را در ابتدای لیست اضافه کن
+    if not any(t['address'] == test_token['address'] for t in DATA_CACHE):
+        DATA_CACHE.append(test_token)
 
-    return render_template('index.html', tokens=tokens_with_test, last_updated=last_updated)
+    return render_template('index.html', tokens=DATA_CACHE, last_updated=last_updated)
 
 @app.route('/watchlist', methods=['POST'])
 def add_to_watchlist():
@@ -205,4 +203,4 @@ def add_to_watchlist():
 if __name__ == '__main__':
     threading.Thread(target=auto_fetch, daemon=True).start()
     threading.Thread(target=auto_telegram, daemon=True).start()
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 10000)), debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
