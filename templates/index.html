@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <title>میم‌کوین‌های مستعد</title>
+    
+
     <style>
         body {
             font-family: "Tahoma", sans-serif;
@@ -77,6 +79,13 @@
 </head>
 <body>
     <h1>میم‌کوین‌های مستعد</h1>
+    <div style="margin-bottom: 20px;">
+    <a href="/filters">
+        <button style="background-color: #007bff; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer;">
+            ⚙️ ویرایش فیلترها
+        </button>
+    </a>
+</div>
     <a href="{{ url_for('show_watchlist') }}" class="watchlist-link">📋 مشاهده واچ‌لیست</a>
 
     {% for token in tokens %}
