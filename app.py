@@ -13,7 +13,7 @@ CHAT_ID = int(os.getenv('CHAT_ID'))
 
 app = Flask(__name__)
 
-# API تنظیمات
+# تنظیمات API
 base_url = 'https://api.geckoterminal.com/api/v2'
 networks = ['solana', 'base', 'arbitrum']
 
@@ -26,13 +26,18 @@ min_liquidity = 90000
 min_liq_to_cap_ratio = 0.3
 max_total_supply = 1_000_000_000
 
+# کش دیتا
 DATA_CACHE = []
 last_updated = None
-WATCHLIST_FILE = 'watchlist.json'
 
-if not os.path.exists(WATCHLIST_FILE):
-    with open(WATCHLIST_FILE, 'w') as f:
-        json.dump([], f)
+WATCHLIST_FILE = 'watchlist.json'
+ALERTED_TOKENS_FILE = 'alerted_tokens.json'
+
+# فایل‌های اولیه
+for file in [WATCHLIST_FILE, ALERTED_TOKENS_FILE]:
+    if not os.path.exists(file):
+        with open(file, 'w') as f:
+            json.dump([], f)
 
 def send_telegram_message(message):
     url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
@@ -67,6 +72,7 @@ def get_top_holders(network, token_address):
 def fetch_data():
     global DATA_CACHE, last_updated
     DATA_CACHE = []
+
     for network in networks:
         try:
             pools = get_top_pools(network)
@@ -83,6 +89,7 @@ def fetch_data():
                 token_name = base_token.get('name')
                 token_symbol = base_token.get('symbol')
 
+                # فیلترهای اولیه
                 if (not token_name or not token_symbol or
                     market_cap < min_market_cap or
                     liquidity < min_liquidity or
@@ -133,15 +140,41 @@ def fetch_data():
                 }
 
                 DATA_CACHE.append(token_data)
+
         except Exception as e:
             print(f"خطا در پردازش شبکه {network}: {e}")
 
     last_updated = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+    alert_new_tokens()
 
-def auto_fetch():
-    while True:
-        fetch_data()
-        time.sleep(60)
+def alert_new_tokens():
+    with open(ALERTED_TOKENS_FILE, 'r+') as f:
+        alerted = json.load(f)
+
+        new_alerts = []
+        for item in DATA_CACHE:
+            if item['address'] not in alerted:
+                msg = f"""
+🚨 <b>توکن جدید شناسایی شد!</b>
+
+📢 <b>{item['token_name']} ({item['token_symbol']})</b>
+🌐 <b>Network:</b> {item['network']}
+💰 <b>Liquidity:</b> ${item['liquidity']:,.0f}
+📈 <b>Market Cap:</b> ${item['market_cap']:,.0f}
+⏱ <b>Age:</b> {item['age']} mins
+📊 <b>24h Volume:</b> ${item['volume_24h']:,.0f}
+📉 <b>5m Change:</b> {item['price_change_5m']}%
+🔗 <b>Token:</b> <code>{item['address']}</code>
+🚨 <b>Risks:</b> {' | '.join(item['risks']) if item['risks'] else 'None'}
+"""
+                send_telegram_message(msg)
+                new_alerts.append(item['address'])
+
+        if new_alerts:
+            alerted.extend(new_alerts)
+            f.seek(0)
+            json.dump(alerted, f)
+            f.truncate()
 
 def send_watchlist_to_telegram():
     with open(WATCHLIST_FILE, 'r') as f:
@@ -162,6 +195,11 @@ def send_watchlist_to_telegram():
 """
             send_telegram_message(msg)
 
+def auto_fetch():
+    while True:
+        fetch_data()
+        time.sleep(60)
+
 def auto_telegram():
     while True:
         send_watchlist_to_telegram()
@@ -169,23 +207,6 @@ def auto_telegram():
 
 @app.route('/')
 def index():
-    test_token = {
-        'network': 'testnet',
-        'token_name': 'توکن تستی',
-        'token_symbol': 'TEST',
-        'liquidity': 150000,
-        'market_cap': 800000,
-        'age': 10,
-        'volume_24h': 1200000,
-        'price_change_5m': 8.5,
-        'address': '0xTestTokenAddress1234567890',
-        'socials': {'twitter': 'https://twitter.com/testtoken'},
-        'risks': []
-    }
-
-    if not any(t['address'] == test_token['address'] for t in DATA_CACHE):
-        DATA_CACHE.append(test_token)
-
     return render_template('index.html', tokens=DATA_CACHE, last_updated=last_updated)
 
 @app.route('/watchlist', methods=['POST'])
@@ -203,4 +224,4 @@ def add_to_watchlist():
 if __name__ == '__main__':
     threading.Thread(target=auto_fetch, daemon=True).start()
     threading.Thread(target=auto_telegram, daemon=True).start()
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
