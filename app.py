@@ -4,14 +4,15 @@ import os
 from datetime import datetime
 import threading
 import time
+import random
 
 app = Flask(__name__)
 
 WATCHLIST = []
 TOKEN_CACHE = []
 LAST_UPDATED = None
-PREVIOUS_PRICES = {}  # برای مانیتور نوسان قیمت
-PRICE_ALERT_THRESHOLD = 20  # درصد تغییر برای هشدار
+PREVIOUS_PRICES = {}
+PRICE_ALERT_THRESHOLD = 20  # درصد
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
@@ -36,63 +37,71 @@ def send_telegram_message(text):
 def fetch_data():
     global TOKEN_CACHE, LAST_UPDATED, PREVIOUS_PRICES
 
+    tokens = []
+
+    # توکن تستی
+    test_token_address = "0xTestTokenAddress"
+    base_price = PREVIOUS_PRICES.get(test_token_address, 0.1)
+    # نوسان ±30٪ در قیمت
+    new_price = round(base_price * (1 + random.uniform(-0.3, 0.3)), 6)
+
+    if base_price and abs((new_price - base_price) / base_price * 100) >= PRICE_ALERT_THRESHOLD:
+        percent_change = ((new_price - base_price) / base_price) * 100
+        send_telegram_message(f"""
+🚨 <b>Test Token Price Alert!</b>
+🧪 <b>Test Token (TEST)</b>
+💲 <b>Old Price:</b> ${base_price:.6f}
+💲 <b>New Price:</b> ${new_price:.6f}
+📊 <b>Change:</b> {percent_change:.2f}%
+🔗 <b>Token:</b> <code>{test_token_address}</code>
+""")
+
+    PREVIOUS_PRICES[test_token_address] = new_price
+    tokens.append({
+        "name": "Test Token",
+        "symbol": "TEST",
+        "address": test_token_address,
+        "network": "TestNet",
+        "price": new_price
+    })
+
+    # دریافت توکن‌های واقعی از DexScreener (اختیاری)
     try:
         response = requests.get("https://api.dexscreener.com/latest/dex/pairs")
         data = response.json()
-
-        tokens = []
         for pool in data.get("pairs", []):
-            token_name = pool.get("baseToken", {}).get("name")
-            token_symbol = pool.get("baseToken", {}).get("symbol")
-            token_address = pool.get("baseToken", {}).get("address")
-            network = pool.get("chainId")
-            attributes = pool.get("priceUsd", {})
-
-            if not token_name or not token_symbol or not token_address:
+            base = pool.get("baseToken", {})
+            if not base.get("address"):
                 continue
+            token_address = base["address"]
+            price = float(pool.get("priceUsd", 0))
 
-            current_price = float(pool.get("priceUsd", 0))
             prev_price = PREVIOUS_PRICES.get(token_address)
-
-            # هشدار نوسان قیمت
-            if prev_price:
-                percent_change = ((current_price - prev_price) / prev_price) * 100
-                if abs(percent_change) >= PRICE_ALERT_THRESHOLD:
-                    msg = f"""
+            if prev_price and abs((price - prev_price) / prev_price * 100) >= PRICE_ALERT_THRESHOLD:
+                percent_change = ((price - prev_price) / prev_price) * 100
+                send_telegram_message(f"""
 🚨 <b>Price Alert!</b>
-📉 <b>{token_name} ({token_symbol})</b>
-🌐 <b>Network:</b> {network}
+📉 <b>{base.get("name")} ({base.get("symbol")})</b>
+🌐 <b>Network:</b> {pool.get("chainId")}
 💲 <b>Old Price:</b> ${prev_price:.6f}
-💲 <b>New Price:</b> ${current_price:.6f}
+💲 <b>New Price:</b> ${price:.6f}
 📊 <b>Change:</b> {percent_change:.2f}%
 🔗 <b>Token:</b> <code>{token_address}</code>
-"""
-                    send_telegram_message(msg)
+""")
 
-            PREVIOUS_PRICES[token_address] = current_price
-
+            PREVIOUS_PRICES[token_address] = price
             tokens.append({
-                "name": token_name,
-                "symbol": token_symbol,
+                "name": base.get("name"),
+                "symbol": base.get("symbol"),
                 "address": token_address,
-                "network": network,
-                "price": current_price
+                "network": pool.get("chainId"),
+                "price": price
             })
-
-        # افزودن توکن تستی برای بررسی عملکرد
-        tokens.append({
-            "name": "Test Token",
-            "symbol": "TEST",
-            "address": "0xTestTokenAddress",
-            "network": "TestNet",
-            "price": 0.1234
-        })
-
-        TOKEN_CACHE = tokens
-        LAST_UPDATED = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-
     except Exception as e:
-        print(f"Error fetching data: {e}")
+        print(f"Error fetching real tokens: {e}")
+
+    TOKEN_CACHE = tokens
+    LAST_UPDATED = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 
 
 @app.route('/')
@@ -112,7 +121,7 @@ def add_to_watchlist():
 def background_updater():
     while True:
         fetch_data()
-        time.sleep(300)  # هر ۵ دقیقه یک بار
+        time.sleep(300)
 
 
 if __name__ == '__main__':
