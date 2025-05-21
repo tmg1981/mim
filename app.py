@@ -1,67 +1,217 @@
-from flask import Flask, render_template, request, redirect
-import datetime
-import pytz
+from flask import Flask, render_template, request, jsonify
 import requests
+import time
+import threading
+import json
 import os
+from dotenv import load_dotenv
+from datetime import datetime
+import pytz
+
+load_dotenv()
+
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+CHAT_ID = int(os.getenv('CHAT_ID'))
 
 app = Flask(__name__)
 
-# محیط زمان محلی (تهران)
-tehran = pytz.timezone('Asia/Tehran')
+# تنظیمات API
+base_url = 'https://api.geckoterminal.com/api/v2'
+networks = ['solana', 'base', 'arbitrum']
 
-# متغیر محیطی برای توکن ربات تلگرام
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+# فیلترها
+min_market_cap = 500000
+min_volume_24h = 1000000
+min_price_change_5m = 5
+max_age_minutes = 120  # توکن تازه‌لانچ‌شده
+min_liquidity = 90000
+min_liq_to_cap_ratio = 0.3
+max_total_supply = 1_000_000_000
 
-# توکن تستی
-TOKENS = [
-    {
-        "name": "Test Token",
-        "symbol": "TST",
-        "price_usd": 0.01,
-        "liquidity_usd": 100000,
-        "market_cap": 200000,
-        "price_change_5m": 25,  # درصد تغییر بالا برای تست
-        "pair_address": "0x1234567890abcdef"
+# کش دیتا
+DATA_CACHE = []
+last_updated = None
+WATCHLIST_FILE = 'watchlist.json'
+if not os.path.exists(WATCHLIST_FILE):
+    with open(WATCHLIST_FILE, 'w') as f:
+        json.dump([], f)
+
+def send_telegram_message(message):
+    url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
+    data = {
+        'chat_id': CHAT_ID,
+        'text': message,
+        'parse_mode': 'HTML'
     }
-]
+    try:
+        resp = requests.post(url, data=data)
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"Telegram send error: {e}")
 
-WATCHLIST = set()
+def get_top_pools(network):
+    url = f'{base_url}/networks/{network}/pools'
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json().get('data', [])
+    return []
 
-def send_telegram_message(text):
-    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": text,
-            "parse_mode": "HTML"
-        }
+def get_token_info(network, token_address):
+    url = f'{base_url}/networks/{network}/tokens/{token_address}/info'
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json().get('data', {}).get('attributes', {})
+    return {}
+
+def get_top_holders(network, token_address):
+    url = f'{base_url}/networks/{network}/tokens/{token_address}/top_holders'
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json().get('data', [])
+    return []
+
+def fetch_data():
+    global DATA_CACHE, last_updated
+    DATA_CACHE = []
+    for network in networks:
         try:
-            requests.post(url, data=payload)
+            pools = get_top_pools(network)
+            for pool in pools:
+                attributes = pool['attributes']
+                liquidity = float(attributes.get('reserve_in_usd', 0))
+                market_cap = float(attributes.get('market_cap_usd', 0) or 0)
+                age_minutes = int(attributes.get('age_minutes', 0))
+                volume_24h = float(attributes.get('volume_usd_24h', 0))
+                price_change_5m = float(attributes.get('price_change_percentage_5m', 0))
+
+                base_token = attributes.get('base_token', {})
+                token_address = base_token.get('address')
+                token_name = base_token.get('name')
+                token_symbol = base_token.get('symbol')
+
+                # فیلترهای اولیه
+                if (not token_name or not token_symbol or
+                    market_cap < min_market_cap or
+                    liquidity < min_liquidity or
+                    market_cap == 0 or
+                    liquidity / market_cap < min_liq_to_cap_ratio or
+                    age_minutes > max_age_minutes or
+                    volume_24h < min_volume_24h or
+                    price_change_5m < min_price_change_5m):
+                    continue
+
+                token_info = get_token_info(network, token_address)
+                socials = token_info.get('socials', {})
+                creator_token_count = token_info.get('creator_token_count', 0)
+                total_supply = float(token_info.get('total_supply', 0) or 0)
+
+                if total_supply > max_total_supply:
+                    continue
+
+                holders = get_top_holders(network, token_address)
+                top_10_percent = sum(float(h['attributes']['percentage']) for h in holders[:10]) if holders else 0
+                top_holder_percent = float(holders[0]['attributes']['percentage']) if holders else 0
+                top_holder_label = holders[0]['attributes'].get('label', '') if holders else ''
+
+                # بررسی ریسک‌ها
+                risk_notes = []
+                if top_10_percent > 25:
+                    risk_notes.append("Top 10 > 25%")
+                if creator_token_count > 0:
+                    risk_notes.append("Creator سابقه دارد")
+                if top_holder_percent > 10:
+                    risk_notes.append("1 نفر > 10%")
+                if top_holder_label.lower() != 'liquidity pool':
+                    risk_notes.append("هولدر اول شخصی است")
+                if not socials.get('twitter') and not socials.get('telegram'):
+                    risk_notes.append("بدون سوشال‌مدیا")
+
+                token_data = {
+                    'network': network,
+                    'token_name': token_name,
+                    'token_symbol': token_symbol,
+                    'liquidity': liquidity,
+                    'market_cap': market_cap,
+                    'age': age_minutes,
+                    'volume_24h': volume_24h,
+                    'price_change_5m': price_change_5m,
+                    'address': token_address,
+                    'socials': socials,
+                    'risks': risk_notes,
+                    'chart_url': f"https://www.dextools.io/app/en/{network}/pair-explorer/{token_address}"
+                }
+
+                DATA_CACHE.append(token_data)
         except Exception as e:
-            print("Telegram error:", e)
+            print(f"خطا در پردازش شبکه {network}: {e}")
 
-@app.route("/")
-def index():
-    now_tehran = datetime.datetime.now(tehran)
-    last_updated = now_tehran.strftime('%Y-%m-%d %H:%M:%S')
+    # اضافه کردن توکن تستی برای تست دکمه‌ها و پیام تلگرام
+    test_token = {
+        'network': 'testnet',
+        'token_name': 'توکن تستی',
+        'token_symbol': 'TST',
+        'liquidity': 150000,
+        'market_cap': 1000000,
+        'age': 5,
+        'volume_24h': 200000,
+        'price_change_5m': 25,  # بالای 20 درصد برای تست هشدار
+        'address': '0xTestTokenAddress1234567890',
+        'socials': {'twitter': 'https://twitter.com/testtoken', 'telegram': None},
+        'risks': [],
+        'chart_url': 'https://www.dextools.io/app/en/ethereum/pair-explorer/0xTestTokenAddress1234567890'
+    }
+    DATA_CACHE.append(test_token)
 
-    # هشدار قیمت بالا
-    for token in TOKENS:
-        if token["price_change_5m"] > 20 and token["symbol"] not in WATCHLIST:
-            msg = f"🚨 تغییر قیمت شدید برای <b>{token['name']} ({token['symbol']})</b>\n📈 تغییر: {token['price_change_5m']}%\n💧 لیکوئیدیتی: ${token['liquidity_usd']:,}"
+    # زمان بروزرسانی با timezone تهران
+    tz = pytz.timezone('Asia/Tehran')
+    last_updated = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+
+def auto_fetch():
+    while True:
+        fetch_data()
+        time.sleep(60)
+
+def send_watchlist_to_telegram():
+    with open(WATCHLIST_FILE, 'r') as f:
+        watchlist = json.load(f)
+
+    for item in DATA_CACHE:
+        if item['address'] in watchlist:
+            msg = f"""
+📢 <b>{item['token_name']} ({item['token_symbol']})</b>
+🌐 <b>Network:</b> {item['network']}
+💰 <b>Liquidity:</b> ${item['liquidity']:,.0f}
+📈 <b>Market Cap:</b> ${item['market_cap']:,.0f}
+⏱ <b>Age:</b> {item['age']} mins
+📊 <b>24h Volume:</b> ${item['volume_24h']:,.0f}
+📉 <b>5m Change:</b> {item['price_change_5m']}%
+🔗 <b>Token:</b> <code>{item['address']}</code>
+🚨 <b>Risks:</b> {' | '.join(item['risks']) if item['risks'] else 'None'}
+"""
             send_telegram_message(msg)
 
-    return render_template("index.html", tokens=TOKENS, last_updated=last_updated)
+def auto_telegram():
+    while True:
+        send_watchlist_to_telegram()
+        time.sleep(60)
 
-@app.route("/add_to_watchlist/<symbol>", methods=["POST"])
-def add_to_watchlist(symbol):
-    WATCHLIST.add(symbol)
-    token = next((t for t in TOKENS if t["symbol"] == symbol), None)
-    if token:
-        msg = f"👁 توکن <b>{token['name']} ({symbol})</b> به واچ‌لیست افزوده شد."
-        send_telegram_message(msg)
-    return redirect("/")
+@app.route('/')
+def index():
+    return render_template('index.html', tokens=DATA_CACHE, last_updated=last_updated)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+@app.route('/watchlist', methods=['POST'])
+def add_to_watchlist():
+    token_address = request.json.get('address')
+    with open(WATCHLIST_FILE, 'r+') as f:
+        watchlist = json.load(f)
+        if token_address not in watchlist:
+            watchlist.append(token_address)
+            f.seek(0)
+            json.dump(watchlist, f)
+            f.truncate()
+    return jsonify({'status': 'ok'})
+
+if __name__ == '__main__':
+    threading.Thread(target=auto_fetch, daemon=True).start()
+    threading.Thread(target=auto_telegram, daemon=True).start()
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 10000)), debug=True)

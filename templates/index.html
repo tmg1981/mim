@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fa">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>میم‌کوین‌های مستعد</title>
     <style>
         body {
@@ -16,6 +16,7 @@
             margin-bottom: 15px;
             border-radius: 12px;
             box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            direction: rtl;
         }
         button {
             padding: 10px 16px;
@@ -25,11 +26,41 @@
             font-size: 15px;
             border-radius: 8px;
             cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #218838;
         }
         .timestamp {
             font-size: 14px;
             color: #777;
             margin-top: 30px;
+            text-align: center;
+        }
+        .price-change {
+            font-weight: bold;
+        }
+        .price-positive {
+            color: #28a745;
+        }
+        .price-negative {
+            color: #dc3545;
+        }
+        .chart-link {
+            display: inline-block;
+            margin-top: 6px;
+            font-size: 14px;
+            text-decoration: none;
+            color: #007bff;
+        }
+        .chart-link:hover {
+            text-decoration: underline;
+        }
+        .msg {
+            color: green;
+            margin-top: 8px;
+            font-size: 14px;
+            display: none;
         }
     </style>
 </head>
@@ -38,17 +69,48 @@
 
     {% for token in tokens %}
     <div class="token">
-        <h2>{{ token.name }} ({{ token.symbol }})</h2>
-        <p>💲 قیمت: {{ token.price_usd }} دلار</p>
-        <p>💧 لیکوئیدیتی: {{ token.liquidity_usd }} دلار</p>
-        <p>💰 مارکت‌کپ: {{ token.market_cap }} دلار</p>
-        <p>📉 تغییر قیمت ۵ دقیقه‌ای: {{ token.price_change_5m }}%</p>
-        <form action="/add_to_watchlist/{{ token.symbol }}" method="post">
-            <button type="submit">➕ افزودن به واچ‌لیست</button>
-        </form>
+        <h2>{{ token.token_name }} ({{ token.token_symbol }})</h2>
+        <p>💲 قیمت: {{ token.price_usd or "نامشخص" }} دلار</p>
+        <p>💧 لیکوئیدیتی: {{ "{:,.0f}".format(token.liquidity) }} دلار</p>
+        <p>💰 مارکت‌کپ: {{ "{:,.0f}".format(token.market_cap) }} دلار</p>
+        <p>
+            📉 تغییر قیمت ۵ دقیقه‌ای: 
+            <span class="price-change {% if token.price_change_5m >= 0 %}price-positive{% else %}price-negative{% endif %}">
+                {{ token.price_change_5m }}%
+            </span>
+        </p>
+        {% if token.address %}
+        <a 
+          href="https://www.coingecko.com/en/coins/{{ token.token_symbol | lower }}" 
+          target="_blank" 
+          class="chart-link"
+          >📈 نمودار قیمت</a>
+        {% endif %}
+
+        <button onclick="addToWatchlist('{{ token.address }}', this)">➕ افزودن به واچ‌لیست</button>
+        <div class="msg">به واچ‌لیست اضافه شد!</div>
     </div>
     {% endfor %}
 
     <div class="timestamp">آخرین بروزرسانی: {{ last_updated }}</div>
+
+    <script>
+    function addToWatchlist(address, btn) {
+        fetch('/watchlist', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({address: address})
+        }).then(response => response.json())
+        .then(data => {
+            if(data.status === 'ok') {
+                const msg = btn.nextElementSibling;
+                msg.style.display = 'inline-block';
+                setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            } else {
+                alert('خطا در افزودن به واچ‌لیست');
+            }
+        }).catch(() => alert('خطا در ارتباط با سرور'));
+    }
+    </script>
 </body>
 </html>
