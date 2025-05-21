@@ -1,12 +1,10 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 import requests
 import time
 import threading
 import json
 import os
 from dotenv import load_dotenv
-from datetime import datetime
-import pytz
 
 load_dotenv()
 
@@ -32,8 +30,14 @@ max_total_supply = 1_000_000_000
 DATA_CACHE = []
 last_updated = None
 WATCHLIST_FILE = 'watchlist.json'
+SENT_ALERTS_FILE = 'sent_alerts.json'  # فایل برای ذخیره هشدارهای ارسال شده
+
 if not os.path.exists(WATCHLIST_FILE):
     with open(WATCHLIST_FILE, 'w') as f:
+        json.dump([], f)
+
+if not os.path.exists(SENT_ALERTS_FILE):
+    with open(SENT_ALERTS_FILE, 'w') as f:
         json.dump([], f)
 
 def send_telegram_message(message):
@@ -44,10 +48,9 @@ def send_telegram_message(message):
         'parse_mode': 'HTML'
     }
     try:
-        resp = requests.post(url, data=data)
-        resp.raise_for_status()
+        requests.post(url, data=data)
     except Exception as e:
-        print(f"Telegram send error: {e}")
+        print(f"خطا در ارسال پیام تلگرام: {e}")
 
 def get_top_pools(network):
     url = f'{base_url}/networks/{network}/pools'
@@ -137,34 +140,13 @@ def fetch_data():
                     'price_change_5m': price_change_5m,
                     'address': token_address,
                     'socials': socials,
-                    'risks': risk_notes,
-                    'chart_url': f"https://www.dextools.io/app/en/{network}/pair-explorer/{token_address}"
+                    'risks': risk_notes
                 }
 
                 DATA_CACHE.append(token_data)
         except Exception as e:
             print(f"خطا در پردازش شبکه {network}: {e}")
-
-    # اضافه کردن توکن تستی برای تست دکمه‌ها و پیام تلگرام
-    test_token = {
-        'network': 'testnet',
-        'token_name': 'توکن تستی',
-        'token_symbol': 'TST',
-        'liquidity': 150000,
-        'market_cap': 1000000,
-        'age': 5,
-        'volume_24h': 200000,
-        'price_change_5m': 25,  # بالای 20 درصد برای تست هشدار
-        'address': '0xTestTokenAddress1234567890',
-        'socials': {'twitter': 'https://twitter.com/testtoken', 'telegram': None},
-        'risks': [],
-        'chart_url': 'https://www.dextools.io/app/en/ethereum/pair-explorer/0xTestTokenAddress1234567890'
-    }
-    DATA_CACHE.append(test_token)
-
-    # زمان بروزرسانی با timezone تهران
-    tz = pytz.timezone('Asia/Tehran')
-    last_updated = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+    last_updated = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
 
 def auto_fetch():
     while True:
@@ -175,9 +157,15 @@ def send_watchlist_to_telegram():
     with open(WATCHLIST_FILE, 'r') as f:
         watchlist = json.load(f)
 
+    # خواندن هشدارهای قبلی
+    with open(SENT_ALERTS_FILE, 'r') as f:
+        sent_alerts = json.load(f)
+
     for item in DATA_CACHE:
         if item['address'] in watchlist:
-            msg = f"""
+            # فقط اگر هشدار قبلاً ارسال نشده باشد
+            if item['address'] not in sent_alerts:
+                msg = f"""
 📢 <b>{item['token_name']} ({item['token_symbol']})</b>
 🌐 <b>Network:</b> {item['network']}
 💰 <b>Liquidity:</b> ${item['liquidity']:,.0f}
@@ -188,7 +176,12 @@ def send_watchlist_to_telegram():
 🔗 <b>Token:</b> <code>{item['address']}</code>
 🚨 <b>Risks:</b> {' | '.join(item['risks']) if item['risks'] else 'None'}
 """
-            send_telegram_message(msg)
+                send_telegram_message(msg)
+                sent_alerts.append(item['address'])
+
+    # ذخیره مجدد هشدارهای ارسال شده
+    with open(SENT_ALERTS_FILE, 'w') as f:
+        json.dump(sent_alerts, f)
 
 def auto_telegram():
     while True:
@@ -199,9 +192,18 @@ def auto_telegram():
 def index():
     return render_template('index.html', tokens=DATA_CACHE, last_updated=last_updated)
 
-@app.route('/watchlist', methods=['POST'])
-def add_to_watchlist():
-    token_address = request.json.get('address')
+@app.route('/add_to_watchlist/<symbol>', methods=['POST'])
+def add_to_watchlist(symbol):
+    # با توجه به آدرس توکن
+    # پیدا کردن آدرس توکن از DATA_CACHE بر اساس سمبل
+    token_address = None
+    for token in DATA_CACHE:
+        if token['token_symbol'] == symbol:
+            token_address = token['address']
+            break
+    if not token_address:
+        return jsonify({'status': 'error', 'message': 'Token not found'}), 404
+
     with open(WATCHLIST_FILE, 'r+') as f:
         watchlist = json.load(f)
         if token_address not in watchlist:
@@ -209,9 +211,29 @@ def add_to_watchlist():
             f.seek(0)
             json.dump(watchlist, f)
             f.truncate()
-    return jsonify({'status': 'ok'})
+    return redirect(url_for('index'))
+
+@app.route('/watchlist')
+def watchlist():
+    with open(WATCHLIST_FILE, 'r') as f:
+        watchlist = json.load(f)
+    # فیلتر کردن داده‌ها بر اساس آدرس‌های واچ‌لیست
+    tokens_in_watchlist = [t for t in DATA_CACHE if t['address'] in watchlist]
+    return render_template('watchlist.html', tokens=tokens_in_watchlist)
+
+@app.route('/remove_from_watchlist/<address>', methods=['POST'])
+def remove_from_watchlist(address):
+    with open(WATCHLIST_FILE, 'r+') as f:
+        watchlist = json.load(f)
+        if address in watchlist:
+            watchlist.remove(address)
+            f.seek(0)
+            json.dump(watchlist, f)
+            f.truncate()
+    return redirect(url_for('watchlist'))
 
 if __name__ == '__main__':
+    # اجرای اتوماتیک به صورت thread
     threading.Thread(target=auto_fetch, daemon=True).start()
     threading.Thread(target=auto_telegram, daemon=True).start()
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 10000)), debug=True)
+    app.run(host='0.0.0.0', port=5000)

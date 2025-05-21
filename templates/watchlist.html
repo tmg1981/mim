@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>واچ‌لیست توکن‌ها</title>
+    <style>
+        body {
+            font-family: "Tahoma", sans-serif;
+            background-color: #f9f9f9;
+            padding: 30px;
+            color: #333;
+        }
+        .token {
+            background-color: #fff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 12px;
+            box-shadow: 0 0 8px rgba(0,0,0,0.06);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .token-info {
+            flex-grow: 1;
+        }
+        button {
+            padding: 8px 14px;
+            border: none;
+            background-color: #dc3545;
+            color: white;
+            font-size: 14px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        a {
+            text-decoration: none;
+            color: #007bff;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <h1>📋 واچ‌لیست توکن‌ها</h1>
+    <a href="{{ url_for('index') }}">← بازگشت به صفحه اصلی</a>
+
+    {% if tokens %}
+        {% for token in tokens %}
+        <div class="token">
+            <div class="token-info">
+                <strong>{{ token.token_name }} ({{ token.token_symbol }})</strong><br>
+                قیمت: {{ token.price_change_5m }}% تغییر ۵ دقیقه‌ای<br>
+                لیکوئیدیتی: ${{ '{:,.0f}'.format(token.liquidity) }}<br>
+                مارکت‌کپ: ${{ '{:,.0f}'.format(token.market_cap) }}
+            </div>
+            <form action="/remove_from_watchlist/{{ token.address }}" method="post">
+                <button type="submit">❌ حذف</button>
+            </form>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>واچ‌لیست شما خالی است.</p>
+    {% endif %}
+</body>
+</html>
