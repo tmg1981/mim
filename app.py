@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, jsonify
 import requests
 from datetime import datetime
 import pytz
@@ -6,45 +6,43 @@ import os
 
 app = Flask(__name__)
 
-# متغیرهای محیطی برای تلگرام (تو باید تنظیم کنی)
+# متغیرهای محیطی برای تلگرام
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# لیست واچ‌لیست به صورت set برای جلوگیری از تکراری بودن
+# لیست توکن‌هایی که به واچ‌لیست اضافه شده‌اند
 watchlist = set()
 
-# تابع نمونه برای گرفتن توکن‌ها (مثال با توکن تستی)
+# تابع نمونه برای گرفتن لیست توکن‌ها
 def get_tokens():
-    # اینجا به جای نمونه می‌تونی API اصلی خودت رو صدا بزنی و داده واقعی بگیری
-    tokens = [
-        # اینجا می‌تونی توکن‌های واقعی رو بارگذاری کنی
-    ]
+    tokens = []
 
-    # توکن تستی همیشه اضافه می‌کنیم
+    # نمونه توکن تستی
     test_token = {
-        "name": "TestToken",
-        "symbol": "TTK",
+        "token_name": "TestToken",
+        "token_symbol": "TTK",
         "price_usd": 1.23,
-        "liquidity_usd": 100000,
+        "liquidity": 100000,
         "market_cap": 500000,
         "price_change_5m": 25.5,
-        "contract_address": "0xTestAddress",
+        "address": "0xTestAddress"
     }
-    tokens.insert(0, test_token)
+
+    tokens.append(test_token)
 
     return tokens
 
-# تبدیل زمان به ساعت محلی تهران
+# تابع تبدیل زمان به تهران
 def get_local_time():
     local_tz = pytz.timezone("Asia/Tehran")
     now_utc = datetime.utcnow()
     now_local = now_utc.replace(tzinfo=pytz.utc).astimezone(local_tz)
     return now_local.strftime("%Y-%m-%d %H:%M:%S")
 
-# تابع ارسال پیام به تلگرام
+# ارسال پیام تلگرام
 def send_telegram_message(message):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("Telegram bot token or chat ID not set!")
+        print("⛔ متغیرهای تلگرام تنظیم نشده‌اند.")
         return False
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -56,23 +54,33 @@ def send_telegram_message(message):
         response = requests.post(url, data=payload)
         return response.ok
     except Exception as e:
-        print(f"Error sending telegram message: {e}")
+        print(f"خطا در ارسال پیام تلگرام: {e}")
         return False
 
+# روت اصلی
 @app.route("/", methods=["GET"])
 def index():
     tokens = get_tokens()
     last_updated = get_local_time()
     return render_template("index.html", tokens=tokens, last_updated=last_updated)
 
-@app.route("/add_to_watchlist/<symbol>", methods=["POST"])
-def add_to_watchlist(symbol):
-    if symbol not in watchlist:
-        watchlist.add(symbol)
-        message = f"توکن <b>{symbol}</b> به واچ‌لیست اضافه شد."
-        send_telegram_message(message)
-    return redirect(url_for("index"))
+# روت API برای افزودن توکن به واچ‌لیست
+@app.route("/watchlist", methods=["POST"])
+def add_to_watchlist():
+    data = request.get_json()
+    address = data.get("address")
+
+    if not address:
+        return jsonify({"status": "error", "message": "آدرس توکن ارسال نشده است"}), 400
+
+    if address in watchlist:
+        return jsonify({"status": "ok", "message": "قبلاً اضافه شده"})
+
+    watchlist.add(address)
+    message = f"✅ توکن جدید به واچ‌لیست اضافه شد:\n<code>{address}</code>"
+    send_telegram_message(message)
+
+    return jsonify({"status": "ok", "message": "به واچ‌لیست اضافه شد"})
 
 if __name__ == "__main__":
-    # روی همه IPها و پورت 10000 اجرا شود (مطابق رندر)
     app.run(host="0.0.0.0", port=10000)

@@ -69,22 +69,23 @@
 
     {% for token in tokens %}
     <div class="token">
-        <h2>{{ token.token_name }} ({{ token.token_symbol }})</h2>
+        <h2>{{ token.token_name or "نامشخص" }} ({{ token.token_symbol or "-" }})</h2>
         <p>💲 قیمت: {{ token.price_usd or "نامشخص" }} دلار</p>
-        <p>💧 لیکوئیدیتی: {{ "{:,.0f}".format(token.liquidity) }} دلار</p>
-        <p>💰 مارکت‌کپ: {{ "{:,.0f}".format(token.market_cap) }} دلار</p>
+        <p>💧 لیکوئیدیتی: {{ "{:,.0f}".format(token.liquidity) if token.liquidity is not none else "نامشخص" }} دلار</p>
+        <p>💰 مارکت‌کپ: {{ "{:,.0f}".format(token.market_cap) if token.market_cap is not none else "نامشخص" }} دلار</p>
         <p>
-            📉 تغییر قیمت ۵ دقیقه‌ای: 
+            📉 تغییر قیمت ۵ دقیقه‌ای:
             <span class="price-change {% if token.price_change_5m >= 0 %}price-positive{% else %}price-negative{% endif %}">
-                {{ token.price_change_5m }}%
+                {{ token.price_change_5m if token.price_change_5m is not none else "?" }}%
             </span>
         </p>
+
         {% if token.address %}
-        <a 
-          href="https://www.coingecko.com/en/coins/{{ token.token_symbol | lower }}" 
-          target="_blank" 
+        <a
+          href="https://dexscreener.com/solana/{{ token.address }}"
+          target="_blank"
           class="chart-link"
-          >📈 نمودار قیمت</a>
+        >📈 نمودار قیمت</a>
         {% endif %}
 
         <button onclick="addToWatchlist('{{ token.address }}', this)">➕ افزودن به واچ‌لیست</button>
