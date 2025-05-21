@@ -1,27 +1,22 @@
 <!DOCTYPE html>
 <html lang="fa">
 <head>
-    <meta charset="UTF-8">
-    <title>واچ‌لیست توکن‌ها</title>
+    <meta charset="UTF-8" />
+    <title>واچ‌لیست شما</title>
     <style>
         body {
             font-family: "Tahoma", sans-serif;
-            background-color: #f9f9f9;
+            background-color: #f4f4f4;
             padding: 30px;
             color: #333;
         }
         .token {
             background-color: #fff;
-            padding: 15px;
+            padding: 20px;
             margin-bottom: 15px;
             border-radius: 12px;
-            box-shadow: 0 0 8px rgba(0,0,0,0.06);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .token-info {
-            flex-grow: 1;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            direction: rtl;
         }
         button {
             padding: 8px 14px;
@@ -31,38 +26,39 @@
             font-size: 14px;
             border-radius: 8px;
             cursor: pointer;
+            transition: background-color 0.3s ease;
         }
-        h1 {
-            margin-bottom: 20px;
+        button:hover {
+            background-color: #c82333;
         }
         a {
+            display: inline-block;
+            margin-bottom: 20px;
+            font-size: 16px;
             text-decoration: none;
             color: #007bff;
-            margin-bottom: 20px;
-            display: inline-block;
+        }
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
-    <h1>📋 واچ‌لیست توکن‌ها</h1>
-    <a href="{{ url_for('index') }}">← بازگشت به صفحه اصلی</a>
+    <h1>🔔 واچ‌لیست شما</h1>
 
-    {% if tokens %}
-        {% for token in tokens %}
+    <a href="/">⬅ بازگشت به صفحه اصلی</a>
+
+    {% if symbols %}
+        {% for symbol in symbols %}
         <div class="token">
-            <div class="token-info">
-                <strong>{{ token.token_name }} ({{ token.token_symbol }})</strong><br>
-                قیمت: {{ token.price_change_5m }}% تغییر ۵ دقیقه‌ای<br>
-                لیکوئیدیتی: ${{ '{:,.0f}'.format(token.liquidity) }}<br>
-                مارکت‌کپ: ${{ '{:,.0f}'.format(token.market_cap) }}
-            </div>
-            <form action="/remove_from_watchlist/{{ token.address }}" method="post">
-                <button type="submit">❌ حذف</button>
+            <h2>{{ symbol }}</h2>
+            <form method="post" action="/remove_from_watchlist/{{ symbol }}">
+                <button type="submit">🗑 حذف از واچ‌لیست</button>
             </form>
         </div>
         {% endfor %}
     {% else %}
-        <p>واچ‌لیست شما خالی است.</p>
+        <p>❗ هیچ توکنی در واچ‌لیست شما وجود ندارد.</p>
     {% endif %}
 </body>
 </html>
