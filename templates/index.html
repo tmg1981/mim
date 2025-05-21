@@ -1,63 +1,133 @@
 <!DOCTYPE html>
 <html lang="fa">
 <head>
-<meta charset="UTF-8" />
-<title>داشبورد توکن‌ها</title>
-<style>
-table {border-collapse: collapse; width: 100%;}
-th, td {border: 1px solid #ccc; padding: 8px; text-align: center;}
-button {cursor: pointer;}
-</style>
+    <meta charset="UTF-8" />
+    <title>میم‌کوین‌های مستعد</title>
+    <style>
+        body {
+            font-family: "Tahoma", sans-serif;
+            background-color: #f4f4f4;
+            padding: 30px;
+            color: #333;
+        }
+        .token {
+            background-color: #fff;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            direction: rtl;
+        }
+        button {
+            padding: 10px 16px;
+            border: none;
+            background-color: #28a745;
+            color: white;
+            font-size: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .timestamp {
+            font-size: 14px;
+            color: #777;
+            margin-top: 30px;
+            text-align: center;
+        }
+        .price-change {
+            font-weight: bold;
+        }
+        .price-positive {
+            color: #28a745;
+        }
+        .price-negative {
+            color: #dc3545;
+        }
+        .chart-link {
+            display: inline-block;
+            margin-top: 6px;
+            font-size: 14px;
+            text-decoration: none;
+            color: #007bff;
+        }
+        .chart-link:hover {
+            text-decoration: underline;
+        }
+        .msg {
+            color: green;
+            margin-top: 8px;
+            font-size: 14px;
+            display: none;
+        }
+        .watchlist-link {
+            display: block;
+            margin-bottom: 20px;
+            font-size: 18px;
+            text-decoration: none;
+            color: #007bff;
+            font-weight: bold;
+        }
+        .watchlist-link:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
+    <h1>میم‌کوین‌های مستعد</h1>
+    <a href="{{ url_for('show_watchlist') }}" class="watchlist-link">📋 مشاهده واچ‌لیست</a>
 
-<h2>داشبورد توکن‌ها (آخرین به‌روزرسانی: {{ last_updated }})</h2>
-
-<a href="/watchlist">مشاهده واچ‌لیست</a>
-
-<table>
-  <thead>
-    <tr>
-      <th>نام</th>
-      <th>نماد</th>
-      <th>قیمت (USD)</th>
-      <th>آدرس</th>
-      <th>عملیات</th>
-    </tr>
-  </thead>
-  <tbody>
     {% for token in tokens %}
-    <tr>
-      <td>{{ token.token_name }}</td>
-      <td>{{ token.token_symbol }}</td>
-      <td>{{ token.price_usd | round(4) }}</td>
-      <td>{{ token.address }}</td>
-      <td>
-        <button onclick="addToWatchlist('{{ token.address }}')">افزودن به واچ‌لیست</button>
-      </td>
-    </tr>
+    <div class="token">
+        <div><strong>نام:</strong> {{ token.name }}</div>
+        <div><strong>نماد:</strong> {{ token.symbol }}</div>
+        <div><strong>قیمت (USD):</strong> {{ "%.4f"|format(token.price_usd) }}</div>
+        <div><strong>نقدینگی (USD):</strong> {{ "%.0f"|format(token.liquidity_usd) }}</div>
+        <div><strong>مارکت کپ:</strong> {{ "%.0f"|format(token.market_cap) }}</div>
+        <div>
+            <strong>تغییر قیمت ۵ دقیقه گذشته:</strong>
+            <span class="price-change {% if token.price_change_5m >= 0 %}price-positive{% else %}price-negative{% endif %}">
+                {{ "%.2f"|format(token.price_change_5m) }}%
+            </span>
+        </div>
+        <div>
+            <a href="https://dexscreener.com/ethereum/{{ token.address }}" target="_blank" class="chart-link">📈 نمودار قیمت</a>
+        </div>
+        <button onclick="addToWatchlist('{{ token.address }}', this)">➕ افزودن به واچ‌لیست</button>
+        <div class="msg" id="msg-{{ token.address }}"></div>
+    </div>
     {% endfor %}
-  </tbody>
-</table>
+
+    <div class="timestamp">آخرین به‌روزرسانی: {{ last_updated }}</div>
 
 <script>
-function addToWatchlist(address) {
-  fetch("/watchlist", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address: address })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.status === "ok") {
-      alert("توکن به واچ‌لیست اضافه شد.");
-    } else if(data.status === "exists") {
-      alert("توکن قبلا در واچ‌لیست هست.");
-    } else {
-      alert("خطا در اضافه کردن.");
+async function addToWatchlist(address, btn) {
+    btn.disabled = true;
+    btn.textContent = "در حال افزودن...";
+    try {
+        const res = await fetch("/watchlist/add", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({address: address})
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+            const msgDiv = document.getElementById("msg-" + address);
+            msgDiv.textContent = "به واچ‌لیست اضافه شد!";
+            msgDiv.style.display = "block";
+            btn.style.display = "none";
+        } else {
+            alert("خطا در افزودن به واچ‌لیست: " + data.message);
+            btn.disabled = false;
+            btn.textContent = "➕ افزودن به واچ‌لیست";
+        }
+    } catch (err) {
+        alert("خطا در ارسال درخواست");
+        btn.disabled = false;
+        btn.textContent = "➕ افزودن به واچ‌لیست";
     }
-  })
-  .catch(() => alert("خطا در ارتباط با سرور."));
 }
 </script>
 
