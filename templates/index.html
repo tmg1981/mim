@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <title>میم‌کوین‌های مستعد</title>
     <style>
+        .watchlist-link {
+    display: inline-block;
+    margin-bottom: 20px;
+    padding: 10px 16px;
+    background-color: #007bff;
+    color: white;
+    font-size: 15px;
+    border-radius: 8px;
+    text-decoration: none;
+}
+.watchlist-link:hover {
+    background-color: #0056b3;
+}
+
         body {
             font-family: "Tahoma", sans-serif;
             background-color: #f4f4f4;
@@ -66,6 +80,8 @@
 </head>
 <body>
     <h1>📊 میم‌کوین‌های مستعد</h1>
+<a href="/watchlist" class="watchlist-link">🔔 مشاهده واچ‌لیست</a>
+
 
     {% for token in tokens %}
     <div class="token">

@@ -74,23 +74,28 @@ def get_local_time():
 
 # ارسال پیام به تلگرام
 def send_telegram_message(message):
+    print("Sending to Telegram...")
+    print("Token:", TELEGRAM_BOT_TOKEN)
+    print("Chat ID:", TELEGRAM_CHAT_ID)
+
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("⚠️ Telegram credentials not set.")
+        print("Telegram bot token or chat ID not set!")
         return False
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "HTML"
+    }
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "HTML"
-        }
         response = requests.post(url, data=payload)
-        if response.status_code != 200:
-            print(f"❌ Telegram error: {response.text}")
+        print("Telegram response:", response.text)
         return response.ok
     except Exception as e:
-        print(f"❌ Telegram send error: {e}")
+        print(f"Error sending telegram message: {e}")
         return False
+
 
 @app.route("/", methods=["GET"])
 def index():
