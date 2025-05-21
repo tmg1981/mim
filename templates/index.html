@@ -2,51 +2,53 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
-    <title>میم‌کوین‌های منتخب</title>
+    <title>میم‌کوین‌های مستعد</title>
     <style>
-        body { font-family: sans-serif; direction: rtl; text-align: right; background-color: #f9f9f9; padding: 20px; }
-        h1 { color: #333; }
-        table { width: 100%; border-collapse: collapse; background-color: white; }
-        th, td { border: 1px solid #ccc; padding: 10px; }
-        th { background-color: #eee; }
-        button { padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; }
-        button:hover { background-color: #218838; }
-        .footer { margin-top: 20px; color: gray; font-size: 0.9em; }
+        body {
+            font-family: "Tahoma", sans-serif;
+            background-color: #f4f4f4;
+            padding: 30px;
+            color: #333;
+        }
+        .token {
+            background-color: #fff;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+        button {
+            padding: 10px 16px;
+            border: none;
+            background-color: #28a745;
+            color: white;
+            font-size: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .timestamp {
+            font-size: 14px;
+            color: #777;
+            margin-top: 30px;
+        }
     </style>
 </head>
 <body>
-    <h1>🪙 میم‌کوین‌های منتخب</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>نام</th>
-                <th>نماد</th>
-                <th>شبکه</th>
-                <th>قیمت</th>
-                <th>آدرس</th>
-                <th>واچ‌لیست</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for token in tokens %}
-            <tr>
-                <td>{{ token.name or "-" }}</td>
-                <td>{{ token.symbol or "-" }}</td>
-                <td>{{ token.network or "-" }}</td>
-                <td>${{ "%.6f"|format(token.price) if token.price is not none else "-" }}</td>
-                <td><code>{{ token.address or "-" }}</code></td>
-                <td>
-                    <form method="post" action="/watchlist">
-                        <input type="hidden" name="token_address" value="{{ token.address }}">
-                        <button type="submit">➕ افزودن</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <div class="footer">
-        آخرین بروزرسانی: {{ last_updated or "-" }}
+    <h1>📊 میم‌کوین‌های مستعد</h1>
+
+    {% for token in tokens %}
+    <div class="token">
+        <h2>{{ token.name }} ({{ token.symbol }})</h2>
+        <p>💲 قیمت: {{ token.price_usd }} دلار</p>
+        <p>💧 لیکوئیدیتی: {{ token.liquidity_usd }} دلار</p>
+        <p>💰 مارکت‌کپ: {{ token.market_cap }} دلار</p>
+        <p>📉 تغییر قیمت ۵ دقیقه‌ای: {{ token.price_change_5m }}%</p>
+        <form action="/add_to_watchlist/{{ token.symbol }}" method="post">
+            <button type="submit">➕ افزودن به واچ‌لیست</button>
+        </form>
     </div>
+    {% endfor %}
+
+    <div class="timestamp">آخرین بروزرسانی: {{ last_updated }}</div>
 </body>
 </html>
