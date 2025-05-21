@@ -1,227 +1,120 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request
 import requests
-import time
-import threading
-import json
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-CHAT_ID = int(os.getenv('CHAT_ID'))
+from datetime import datetime
+import threading
+import time
 
 app = Flask(__name__)
 
-# تنظیمات API
-base_url = 'https://api.geckoterminal.com/api/v2'
-networks = ['solana', 'base', 'arbitrum']
+WATCHLIST = []
+TOKEN_CACHE = []
+LAST_UPDATED = None
+PREVIOUS_PRICES = {}  # برای مانیتور نوسان قیمت
+PRICE_ALERT_THRESHOLD = 20  # درصد تغییر برای هشدار
 
-# فیلترها
-min_market_cap = 500000
-min_volume_24h = 1000000
-min_price_change_5m = 5
-max_age_minutes = 120
-min_liquidity = 90000
-min_liq_to_cap_ratio = 0.3
-max_total_supply = 1_000_000_000
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# کش دیتا
-DATA_CACHE = []
-last_updated = None
 
-WATCHLIST_FILE = 'watchlist.json'
-ALERTED_TOKENS_FILE = 'alerted_tokens.json'
-
-# فایل‌های اولیه
-for file in [WATCHLIST_FILE, ALERTED_TOKENS_FILE]:
-    if not os.path.exists(file):
-        with open(file, 'w') as f:
-            json.dump([], f)
-
-def send_telegram_message(message):
-    url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
-    data = {
-        'chat_id': CHAT_ID,
-        'text': message,
-        'parse_mode': 'HTML'
+def send_telegram_message(text):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("TELEGRAM TOKEN OR CHAT_ID NOT SET")
+        return
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML"
     }
-    requests.post(url, data=data)
+    try:
+        requests.post(url, data=payload)
+    except Exception as e:
+        print(f"Error sending Telegram message: {e}")
 
-def get_top_pools(network):
-    url = f'{base_url}/networks/{network}/pools'
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json().get('data', [])
-    return []
-
-def get_token_info(network, token_address):
-    url = f'{base_url}/networks/{network}/tokens/{token_address}/info'
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json().get('data', {}).get('attributes', {})
-    return {}
-
-def get_top_holders(network, token_address):
-    url = f'{base_url}/networks/{network}/tokens/{token_address}/top_holders'
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json().get('data', [])
-    return []
 
 def fetch_data():
-    global DATA_CACHE, last_updated
-    DATA_CACHE = []
+    global TOKEN_CACHE, LAST_UPDATED, PREVIOUS_PRICES
 
-    for network in networks:
-        try:
-            pools = get_top_pools(network)
-            for pool in pools:
-                attributes = pool['attributes']
-                liquidity = float(attributes.get('reserve_in_usd', 0))
-                market_cap = float(attributes.get('market_cap_usd', 0) or 0)
-                age_minutes = int(attributes.get('age_minutes', 0))
-                volume_24h = float(attributes.get('volume_usd_24h', 0))
-                price_change_5m = float(attributes.get('price_change_percentage_5m', 0))
+    try:
+        response = requests.get("https://api.dexscreener.com/latest/dex/pairs")
+        data = response.json()
 
-                base_token = attributes.get('base_token', {})
-                token_address = base_token.get('address')
-                token_name = base_token.get('name')
-                token_symbol = base_token.get('symbol')
+        tokens = []
+        for pool in data.get("pairs", []):
+            token_name = pool.get("baseToken", {}).get("name")
+            token_symbol = pool.get("baseToken", {}).get("symbol")
+            token_address = pool.get("baseToken", {}).get("address")
+            network = pool.get("chainId")
+            attributes = pool.get("priceUsd", {})
 
-                # فیلترهای اولیه
-                if (not token_name or not token_symbol or
-                    market_cap < min_market_cap or
-                    liquidity < min_liquidity or
-                    market_cap == 0 or
-                    liquidity / market_cap < min_liq_to_cap_ratio or
-                    age_minutes > max_age_minutes or
-                    volume_24h < min_volume_24h or
-                    price_change_5m < min_price_change_5m):
-                    continue
+            if not token_name or not token_symbol or not token_address:
+                continue
 
-                token_info = get_token_info(network, token_address)
-                socials = token_info.get('socials', {})
-                creator_token_count = token_info.get('creator_token_count', 0)
-                total_supply = float(token_info.get('total_supply', 0) or 0)
+            current_price = float(pool.get("priceUsd", 0))
+            prev_price = PREVIOUS_PRICES.get(token_address)
 
-                if total_supply > max_total_supply:
-                    continue
-
-                holders = get_top_holders(network, token_address)
-                top_10_percent = sum(float(h['attributes']['percentage']) for h in holders[:10]) if holders else 0
-                top_holder_percent = float(holders[0]['attributes']['percentage']) if holders else 0
-                top_holder_label = holders[0]['attributes'].get('label', '') if holders else ''
-
-                risk_notes = []
-                if top_10_percent > 25:
-                    risk_notes.append("Top 10 > 25%")
-                if creator_token_count > 0:
-                    risk_notes.append("Creator سابقه دارد")
-                if top_holder_percent > 10:
-                    risk_notes.append("1 نفر > 10%")
-                if top_holder_label.lower() != 'liquidity pool':
-                    risk_notes.append("هولدر اول شخصی است")
-                if not socials.get('twitter') and not socials.get('telegram'):
-                    risk_notes.append("بدون سوشال‌مدیا")
-
-                token_data = {
-                    'network': network,
-                    'token_name': token_name,
-                    'token_symbol': token_symbol,
-                    'liquidity': liquidity,
-                    'market_cap': market_cap,
-                    'age': age_minutes,
-                    'volume_24h': volume_24h,
-                    'price_change_5m': price_change_5m,
-                    'address': token_address,
-                    'socials': socials,
-                    'risks': risk_notes
-                }
-
-                DATA_CACHE.append(token_data)
-
-        except Exception as e:
-            print(f"خطا در پردازش شبکه {network}: {e}")
-
-    last_updated = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-    alert_new_tokens()
-
-def alert_new_tokens():
-    with open(ALERTED_TOKENS_FILE, 'r+') as f:
-        alerted = json.load(f)
-
-        new_alerts = []
-        for item in DATA_CACHE:
-            if item['address'] not in alerted:
-                msg = f"""
-🚨 <b>توکن جدید شناسایی شد!</b>
-
-📢 <b>{item['token_name']} ({item['token_symbol']})</b>
-🌐 <b>Network:</b> {item['network']}
-💰 <b>Liquidity:</b> ${item['liquidity']:,.0f}
-📈 <b>Market Cap:</b> ${item['market_cap']:,.0f}
-⏱ <b>Age:</b> {item['age']} mins
-📊 <b>24h Volume:</b> ${item['volume_24h']:,.0f}
-📉 <b>5m Change:</b> {item['price_change_5m']}%
-🔗 <b>Token:</b> <code>{item['address']}</code>
-🚨 <b>Risks:</b> {' | '.join(item['risks']) if item['risks'] else 'None'}
+            # هشدار نوسان قیمت
+            if prev_price:
+                percent_change = ((current_price - prev_price) / prev_price) * 100
+                if abs(percent_change) >= PRICE_ALERT_THRESHOLD:
+                    msg = f"""
+🚨 <b>Price Alert!</b>
+📉 <b>{token_name} ({token_symbol})</b>
+🌐 <b>Network:</b> {network}
+💲 <b>Old Price:</b> ${prev_price:.6f}
+💲 <b>New Price:</b> ${current_price:.6f}
+📊 <b>Change:</b> {percent_change:.2f}%
+🔗 <b>Token:</b> <code>{token_address}</code>
 """
-                send_telegram_message(msg)
-                new_alerts.append(item['address'])
+                    send_telegram_message(msg)
 
-        if new_alerts:
-            alerted.extend(new_alerts)
-            f.seek(0)
-            json.dump(alerted, f)
-            f.truncate()
+            PREVIOUS_PRICES[token_address] = current_price
 
-def send_watchlist_to_telegram():
-    with open(WATCHLIST_FILE, 'r') as f:
-        watchlist = json.load(f)
+            tokens.append({
+                "name": token_name,
+                "symbol": token_symbol,
+                "address": token_address,
+                "network": network,
+                "price": current_price
+            })
 
-    for item in DATA_CACHE:
-        if item['address'] in watchlist:
-            msg = f"""
-📢 <b>{item['token_name']} ({item['token_symbol']})</b>
-🌐 <b>Network:</b> {item['network']}
-💰 <b>Liquidity:</b> ${item['liquidity']:,.0f}
-📈 <b>Market Cap:</b> ${item['market_cap']:,.0f}
-⏱ <b>Age:</b> {item['age']} mins
-📊 <b>24h Volume:</b> ${item['volume_24h']:,.0f}
-📉 <b>5m Change:</b> {item['price_change_5m']}%
-🔗 <b>Token:</b> <code>{item['address']}</code>
-🚨 <b>Risks:</b> {' | '.join(item['risks']) if item['risks'] else 'None'}
-"""
-            send_telegram_message(msg)
+        # افزودن توکن تستی برای بررسی عملکرد
+        tokens.append({
+            "name": "Test Token",
+            "symbol": "TEST",
+            "address": "0xTestTokenAddress",
+            "network": "TestNet",
+            "price": 0.1234
+        })
 
-def auto_fetch():
-    while True:
-        fetch_data()
-        time.sleep(60)
+        TOKEN_CACHE = tokens
+        LAST_UPDATED = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 
-def auto_telegram():
-    while True:
-        send_watchlist_to_telegram()
-        time.sleep(60)
+    except Exception as e:
+        print(f"Error fetching data: {e}")
+
 
 @app.route('/')
 def index():
-    return render_template('index.html', tokens=DATA_CACHE, last_updated=last_updated)
+    return render_template("index.html", tokens=TOKEN_CACHE, last_updated=LAST_UPDATED)
+
 
 @app.route('/watchlist', methods=['POST'])
 def add_to_watchlist():
-    token_address = request.json.get('address')
-    with open(WATCHLIST_FILE, 'r+') as f:
-        watchlist = json.load(f)
-        if token_address not in watchlist:
-            watchlist.append(token_address)
-            f.seek(0)
-            json.dump(watchlist, f)
-            f.truncate()
-    return jsonify({'status': 'ok'})
+    token_address = request.form.get("token_address")
+    if token_address:
+        WATCHLIST.append(token_address)
+        send_telegram_message(f"🔔 توکن به واچ‌لیست افزوده شد: <code>{token_address}</code>")
+    return ('', 204)
+
+
+def background_updater():
+    while True:
+        fetch_data()
+        time.sleep(300)  # هر ۵ دقیقه یک بار
+
 
 if __name__ == '__main__':
-    threading.Thread(target=auto_fetch, daemon=True).start()
-    threading.Thread(target=auto_telegram, daemon=True).start()
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    threading.Thread(target=background_updater, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
