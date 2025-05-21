@@ -1,64 +1,41 @@
 <!DOCTYPE html>
 <html lang="fa">
 <head>
-    <meta charset="UTF-8" />
-    <title>واچ‌لیست شما</title>
-    <style>
-        body {
-            font-family: "Tahoma", sans-serif;
-            background-color: #f4f4f4;
-            padding: 30px;
-            color: #333;
-        }
-        .token {
-            background-color: #fff;
-            padding: 20px;
-            margin-bottom: 15px;
-            border-radius: 12px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-            direction: rtl;
-        }
-        button {
-            padding: 8px 14px;
-            border: none;
-            background-color: #dc3545;
-            color: white;
-            font-size: 14px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        button:hover {
-            background-color: #c82333;
-        }
-        a {
-            display: inline-block;
-            margin-bottom: 20px;
-            font-size: 16px;
-            text-decoration: none;
-            color: #007bff;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
+<meta charset="UTF-8" />
+<title>واچ‌لیست توکن‌ها</title>
+<style>
+table {border-collapse: collapse; width: 100%;}
+th, td {border: 1px solid #ccc; padding: 8px; text-align: center;}
+</style>
 </head>
 <body>
-    <h1>🔔 واچ‌لیست شما</h1>
 
-    <a href="/">⬅ بازگشت به صفحه اصلی</a>
+<h2>واچ‌لیست توکن‌ها (آخرین به‌روزرسانی: {{ last_updated }})</h2>
 
-    {% if symbols %}
-        {% for symbol in symbols %}
-        <div class="token">
-            <h2>{{ symbol }}</h2>
-            <form method="post" action="/remove_from_watchlist/{{ symbol }}">
-                <button type="submit">🗑 حذف از واچ‌لیست</button>
-            </form>
-        </div>
-        {% endfor %}
+<a href="/">بازگشت به داشبورد</a>
+
+<table>
+  <thead>
+    <tr>
+      <th>نام</th>
+      <th>نماد</th>
+      <th>قیمت (USD)</th>
+      <th>آدرس</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for token in tokens %}
+    <tr>
+      <td>{{ token.token_name }}</td>
+      <td>{{ token.token_symbol }}</td>
+      <td>{{ token.price_usd | round(4) }}</td>
+      <td>{{ token.address }}</td>
+    </tr>
     {% else %}
-        <p>❗ هیچ توکنی در واچ‌لیست شما وجود ندارد.</p>
-    {% endif %}
+    <tr><td colspan="4">واچ‌لیست خالی است.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
 </body>
 </html>
