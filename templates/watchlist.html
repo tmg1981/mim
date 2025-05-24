@@ -1,65 +1,51 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa">
 <head>
-  <meta charset="UTF-8" />
-  <title>واچ‌لیست میم‌کوین‌ها</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" />
-  <style>
-    body {
-      background-color: #f8f9fa;
-    }
-    .token-card {
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      padding: 15px;
-      background-color: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      margin-bottom: 15px;
-    }
-    .risk-low { color: green; }
-    .risk-medium { color: orange; }
-    .risk-high { color: red; }
-  </style>
+    <meta charset="UTF-8" />
+    <title>واچ‌لیست میم‌کوین‌ها</title>
+    <style>
+        body {font-family: Arial, sans-serif; direction: rtl; padding: 20px;}
+        table {width: 100%; border-collapse: collapse;}
+        th, td {border: 1px solid #ccc; padding: 8px; text-align: center;}
+        th {background-color: #f2f2f2;}
+        .profit-positive {color: green;}
+        .profit-negative {color: red;}
+    </style>
 </head>
-<body class="container py-4">
-
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>📋 واچ‌لیست میم‌کوین‌ها</h2>
-    <div>
-      <a href="/" class="btn btn-primary">🏠 بازگشت به صفحه اصلی</a>
-    </div>
-  </div>
-
-  {% if tokens %}
-    {% for token in tokens %}
-      <div class="token-card">
-        <h5>{{ token.name }} ({{ token.symbol }})</h5>
-        <p><strong>نقدینگی:</strong> ${{ token.liquidity_usd }} | <strong>تغییر قیمت ۵دقیقه:</strong> {{ token.price_change_5m }}%</p>
-        <p><strong>سازنده چند توکن ساخته؟</strong> {{ token.creator_token_count }} | <strong>تو واچ‌لیست چند نفره؟</strong> {{ token.watchlist_count }}</p>
-        <p><strong>حجم ۲۴ساعته:</strong> ${{ token.volume_24h }}</p>
-        <p><strong>آدرس کانترکت:</strong> {{ token.address }}</p>
-        <p><a href="{{ token.chart_url }}" target="_blank">📈 مشاهده نمودار</a></p>
-
-        <p>
-          <strong>ریسک:</strong>
-          {% if token.risk_level == 'low' %}
-            <span class="risk-low">🟢 پایین</span>
-          {% elif token.risk_level == 'medium' %}
-            <span class="risk-medium">🟠 متوسط</span>
-          {% else %}
-            <span class="risk-high">🔴 بالا</span>
-          {% endif %}
-        </p>
-
-        <form action="/unwatch" method="POST" style="display:inline;">
-          <input type="hidden" name="token_address" value="{{ token.address }}">
-          <button type="submit" class="btn btn-sm btn-outline-danger">❌ حذف از واچ‌لیست</button>
-        </form>
-      </div>
-    {% endfor %}
-  {% else %}
-    <div class="alert alert-info">واچ‌لیست شما خالی است.</div>
-  {% endif %}
-
+<body>
+    <h1>واچ‌لیست میم‌کوین‌ها</h1>
+    <a href="{{ url_for('index') }}">بازگشت به داشبورد</a>
+    {% if watchlist %}
+        <table>
+            <thead>
+                <tr>
+                    <th>نام</th>
+                    <th>نماد</th>
+                    <th>آدرس</th>
+                    <th>قیمت خرید ($)</th>
+                    <th>قیمت فعلی ($)</th>
+                    <th>مقدار</th>
+                    <th>سود/زیان (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in watchlist %}
+                <tr>
+                    <td>{{ item.token_name }}</td>
+                    <td>{{ item.token_symbol }}</td>
+                    <td>{{ item.address }}</td>
+                    <td>{{ "%.5f"|format(item.buy_price) }}</td>
+                    <td>{{ "%.5f"|format(item.current_price) }}</td>
+                    <td>{{ item.amount }}</td>
+                    <td class="{{ 'profit-positive' if item.profit_percent >= 0 else 'profit-negative' }}">
+                        {{ "%.2f"|format(item.profit_percent) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>واچ‌لیست خالی است.</p>
+    {% endif %}
 </body>
 </html>
