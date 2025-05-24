@@ -50,6 +50,25 @@ def index():
         except Exception as e:
             print(f"Error filtering token: {token.get('name')} - {e}")
             continue
+        if not filtered_tokens:
+    test_token = {
+        "name": "TestToken",
+        "symbol": "TTK",
+        "address": "0xTestAddress000000000000000000000000",
+        "liquidity_usd": 100000,
+        "mint_count": 1,
+        "social_score": 1000,
+        "watchlist_count": 200,
+        "liquidity_to_mc": 0.2,
+        "price_change_5m": 1.5,
+        "volume_24h": 10000,
+        "liquidity_locked": "قفل",
+        "creator_token_count": 1,
+        "chart_url": "https://dexscreener.com/chart/testtoken",
+        "risk_level": "low"
+    }
+    filtered_tokens.append(test_token)
+
     return render_template('index.html', tokens=filtered_tokens, watchlist=watchlist,
                            last_updated=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
