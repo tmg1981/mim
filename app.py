@@ -1,200 +1,110 @@
 import os
 import json
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect
 from datetime import datetime
+import pytz
 import telegram
 
 app = Flask(__name__)
 
-# دریافت توکن بات و چت آی‌دی از متغیرهای محیطی
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
+bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
-WATCHLIST_FILE = 'watchlist.json'
 TOKENS_FILE = 'tokens.json'
-FILTERS_FILE = 'filters.json'
+WATCHLIST_FILE = 'watchlist.json'
 
 def load_tokens():
-    try:
-        with open(TOKENS_FILE, 'r', encoding='utf-8') as f:
-            tokens = json.load(f)
-        return tokens
-    except Exception:
+    if not os.path.exists(TOKENS_FILE):
         return []
-
-def load_watchlist():
-    try:
-        with open(WATCHLIST_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return []
+    with open(TOKENS_FILE, 'r') as f:
+        return json.load(f)
 
 def save_watchlist(watchlist):
-    with open(WATCHLIST_FILE, 'w', encoding='utf-8') as f:
-        json.dump(watchlist, f, ensure_ascii=False, indent=2)
+    with open(WATCHLIST_FILE, 'w') as f:
+        json.dump(watchlist, f)
 
-def load_filters():
-    try:
-        with open(FILTERS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
+def load_watchlist():
+    if not os.path.exists(WATCHLIST_FILE):
+        return []
+    with open(WATCHLIST_FILE, 'r') as f:
+        return json.load(f)
 
-def save_filters(filters):
-    with open(FILTERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(filters, f, ensure_ascii=False, indent=2)
-
-# محاسبه سود/زیان ساده برای هر توکن واچ‌لیست (قیمت خرید و فعلی)
-def calculate_profit(token, buy_price):
-    current_price = token.get('price_usd', 0)
-    if buy_price == 0:
-        return 0
-    profit = ((current_price - buy_price) / buy_price) * 100
-    return profit
-
-# ارسال پیام پین شده روزانه در تلگرام
-def send_daily_watchlist_summary():
-    watchlist = load_watchlist()
+def update_pinned_watchlist():
     tokens = load_tokens()
-    
-    # نگاشت آدرس توکن به داده توکن
-    tokens_map = {t['address']: t for t in tokens}
-
-    message_lines = ["📌 *واچ‌لیست روزانه* 📌\n"]
-    total_profit_percent = 0
-    total_invested = 0
-
-    if not watchlist:
-        message_lines.append("_واچ‌لیست خالی است._")
+    watchlist = load_watchlist()
+    matched = [t for t in tokens if t['address'] in watchlist]
+    if not matched:
+        message = "📌 واچ‌لیست امروز:\nهیچ توکنی در واچ‌لیست نیست."
     else:
-        for item in watchlist:
-            address = item['address']
-            buy_price = item.get('buy_price', 0)
-            amount = item.get('amount', 0)
-            token = tokens_map.get(address, {})
-            name = token.get('token_name', 'ناشناخته')
-            symbol = token.get('token_symbol', '')
-            current_price = token.get('price_usd', 0)
-            profit_percent = calculate_profit(token, buy_price)
-            total_invested += buy_price * amount
-            total_profit_percent += profit_percent
+        message = "📌 واچ‌لیست امروز:\n"
+        for t in matched:
+            name = t.get('token_name', 'N/A')
+            symbol = t.get('token_symbol', '')
+            price = t.get('price_usd', 0)
+            buy_price = t.get('buy_price_usd', None)
+            percent = ''
+            if buy_price:
+                diff = round((price - buy_price) / buy_price * 100, 2)
+                emoji = "🟢" if diff > 0 else "🔴"
+                percent = f"{emoji} {diff}%"
+            message += f"- {name} ({symbol}) | ${price} | {percent}\n"
 
-            color = "🟢" if profit_percent >= 0 else "🔴"
-            line = (
-                f"{color} {name} ({symbol}): "
-                f"خرید: {buy_price:.5f}$، قیمت فعلی: {current_price:.5f}$، "
-                f"مقدار: {amount}, "
-                f"سود/زیان: {profit_percent:.2f}%"
-            )
-            message_lines.append(line)
-        
-        avg_profit = total_profit_percent / len(watchlist)
-        message_lines.append(f"\n*میانگین سود/زیان:* {avg_profit:.2f}%")
-
-    message_text = "\n".join(message_lines)
-
-    # ارسال پیام و پین کردن (حذف پین قبلی)
+    # حذف پیام پین‌شده قدیمی و ارسال جدید
     try:
-        bot.unpin_all_chat_messages(chat_id=TELEGRAM_CHAT_ID)
-    except Exception:
+        updates = bot.get_updates()
+        for update in updates:
+            if update.message and update.message.pinned_message:
+                bot.unpin_chat_message(chat_id=TELEGRAM_CHAT_ID, message_id=update.message.pinned_message.message_id)
+    except:
         pass
 
-    sent_message = bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message_text, parse_mode=telegram.ParseMode.MARKDOWN)
-    bot.pin_chat_message(chat_id=TELEGRAM_CHAT_ID, message_id=sent_message.message_id)
+    sent = bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+    bot.pin_chat_message(chat_id=TELEGRAM_CHAT_ID, message_id=sent.message_id)
 
 @app.route('/')
 def index():
     tokens = load_tokens()
+    return render_template('index.html', tokens=tokens)
+
+@app.route('/add_to_watchlist', methods=['POST'])
+def add_to_watchlist():
+    address = request.form['address']
+    tokens = load_tokens()
     watchlist = load_watchlist()
-    watchlist_addresses = {item['address'] for item in watchlist}
-    filters = load_filters()
 
-    # زمان آخرین بروزرسانی (به فرمت زمان محلی UTC+3:30 مثلا تهران)
-    now = datetime.utcnow()
-    # تبدیل UTC به تهران +3:30 ساعت
-    local_time = now.replace(hour=(now.hour + 3) % 24, minute=(now.minute + 30) % 60)
-    last_update = local_time.strftime('%Y-%m-%d %H:%M:%S')
+    token = next((t for t in tokens if t['address'] == address), None)
+    if token:
+        if address not in watchlist:
+            token['buy_price_usd'] = token.get('price_usd')
+            watchlist.append(address)
+            save_watchlist(watchlist)
+            update_pinned_watchlist()
+            bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=f"➕ {token['token_name']} به واچ‌لیست افزوده شد.")
+    return redirect('/')
 
-    return render_template('index.html',
-                           tokens=tokens,
-                           watchlist_addresses=watchlist_addresses,
-                           filters=filters,
-                           last_update=last_update)
-
-@app.route('/watch', methods=['POST'])
-def watch():
-    address = request.form.get('token_address')
-    buy_price = float(request.form.get('buy_price', 0))
-    amount = float(request.form.get('amount', 0))
-    if not address:
-        return redirect(url_for('index'))
-
+@app.route('/remove_from_watchlist', methods=['POST'])
+def remove_from_watchlist():
+    address = request.form['address']
     watchlist = load_watchlist()
-    # اگر توکن قبلا اضافه نشده، اضافه کن
-    if not any(item['address'] == address for item in watchlist):
-        watchlist.append({
-            'address': address,
-            'buy_price': buy_price,
-            'amount': amount
-        })
+    if address in watchlist:
+        watchlist.remove(address)
         save_watchlist(watchlist)
-        send_daily_watchlist_summary()
-
-    return redirect(url_for('index'))
-
-@app.route('/unwatch', methods=['POST'])
-def unwatch():
-    address = request.form.get('token_address')
-    if not address:
-        return redirect(url_for('index'))
-
-    watchlist = load_watchlist()
-    watchlist = [item for item in watchlist if item['address'] != address]
-    save_watchlist(watchlist)
-    send_daily_watchlist_summary()
-
-    return redirect(url_for('index'))
+        update_pinned_watchlist()
+        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=f"➖ توکن با آدرس {address} از واچ‌لیست حذف شد.")
+    return redirect('/')
 
 @app.route('/watchlist')
-def watchlist_view():
-    watchlist = load_watchlist()
+def watchlist():
     tokens = load_tokens()
-    tokens_map = {t['address']: t for t in tokens}
+    watchlist = load_watchlist()
+    selected = [t for t in tokens if t['address'] in watchlist]
+    return render_template('watchlist.html', tokens=selected)
 
-    detailed_list = []
-    for item in watchlist:
-        token = tokens_map.get(item['address'], {})
-        if token:
-            detailed = {
-                'token_name': token.get('token_name', ''),
-                'token_symbol': token.get('token_symbol', ''),
-                'address': item['address'],
-                'buy_price': item.get('buy_price', 0),
-                'amount': item.get('amount', 0),
-                'current_price': token.get('price_usd', 0),
-                'profit_percent': calculate_profit(token, item.get('buy_price', 0))
-            }
-            detailed_list.append(detailed)
-
-    return render_template('watchlist.html', watchlist=detailed_list)
-
-@app.route('/edit_filters', methods=['GET', 'POST'])
+@app.route('/edit_filters')
 def edit_filters():
-    if request.method == 'POST':
-        filters_json = request.form.get('filters_json')
-        try:
-            filters = json.loads(filters_json)
-            save_filters(filters)
-            return redirect(url_for('index'))
-        except Exception:
-            return "JSON نامعتبر است", 400
-    else:
-        filters = load_filters()
-        filters_json = json.dumps(filters, ensure_ascii=False, indent=2)
-        return render_template('edit_filters.html', filters_json=filters_json)
+    return "<h3>🛠 صفحه ویرایش فیلترها در حال توسعه است.</h3>"
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)
