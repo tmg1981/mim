@@ -2,82 +2,102 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
-    <title>میم‌کوین‌شناس</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <title>میم‌کوین‌های مستعد</title>
     <style>
         body {
-            background-color: #f7f7f7;
+            font-family: Vazirmatn, sans-serif;
+            direction: rtl;
+            background-color: #f5f5f5;
             padding: 20px;
         }
-        .container {
-            max-width: 1200px;
+        h1 {
+            text-align: center;
         }
-        .card {
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
         }
-        .risk-low { color: green; font-weight: bold; }
-        .risk-medium { color: orange; font-weight: bold; }
-        .risk-high { color: red; font-weight: bold; }
+        .top-bar a {
+            text-decoration: none;
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background-color: #eee;
+        }
+        .btn {
+            padding: 6px 10px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn:disabled {
+            background-color: #aaa;
+            cursor: default;
+        }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>📈 میم‌کوین‌شناس</h1>
-        <a href="/edit_filters" class="btn btn-secondary">✏️ ویرایش فیلترها</a>
+    <h1>میم‌کوین‌های مستعد</h1>
+
+    <div class="top-bar">
+        <div>آخرین به‌روزرسانی: {{ last_updated }}</div>
+        <div><a href="/edit_filters">ویرایش فیلترها</a></div>
     </div>
 
-    {% if tokens|length == 0 %}
-        <div class="alert alert-warning text-center">
-            هیچ توکنی پیدا نشد. نمایش توکن تستی برای بررسی ظاهر صفحه:
-        </div>
-        {% set tokens = [{
-            "name": "TestToken",
-            "symbol": "TST",
-            "address": "0x1234567890abcdef",
-            "price_usd": 0.01,
-            "liquidity_usd": 100000,
-            "price_change_5m": 3.2,
-            "liquidity_locked": "قفل",
-            "creator_token_count": 1,
-            "volume_24h": 50000,
-            "social_score": 1200,
-            "watchlist_count": 300,
-            "liquidity_to_mc": 0.15,
-            "risk_level": "low"
-        }] %}
-    {% endif %}
-
-    {% for token in tokens %}
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title d-flex justify-content-between">
-                    <span>{{ token.name }} ({{ token.symbol }})</span>
-                    <span class="{% if token.risk_level == 'low' %}risk-low{% elif token.risk_level == 'medium' %}risk-medium{% else %}risk-high{% endif %}">
-                        ● {{ "ریسک پایین" if token.risk_level == 'low' else "ریسک متوسط" if token.risk_level == 'medium' else "ریسک بالا" }}
-                    </span>
-                </h5>
-                <p class="card-text">
-                    💲 قیمت: {{ token.price_usd }} دلار<br>
-                    💧 لیکوئیدیتی: {{ token.liquidity_usd }} دلار<br>
-                    📉 تغییر ۵ دقیقه: {{ token.price_change_5m }}٪<br>
-                    🔒 وضعیت لیکوئیدیتی: {{ token.liquidity_locked }}<br>
-                    👤 تعداد توکن‌های ساخته‌شده توسط خالق: {{ token.creator_token_count }}<br>
-                    📊 حجم معاملات ۲۴ساعت: {{ token.volume_24h }} دلار<br>
-                    🧠 امتیاز اجتماعی: {{ token.social_score }}<br>
-                    📌 تعداد واچ‌لیست‌ها: {{ token.watchlist_count }}<br>
-                    🔗 آدرس کانترکت: <code>{{ token.address }}</code><br>
-                    📈 <a href="https://dexscreener.com/search?q={{ token.address }}" target="_blank">مشاهده نمودار</a>
-                </p>
-                <form method="post" action="/watch">
-                    <input type="hidden" name="token_address" value="{{ token.address }}">
-                    <button type="submit" class="btn btn-outline-primary">➕ افزودن به واچ‌لیست</button>
-                </form>
-            </div>
-        </div>
-    {% endfor %}
-
-    <p class="text-muted text-center mt-4">آخرین بروزرسانی: {{ last_updated }}</p>
-</div>
+    <table>
+        <thead>
+            <tr>
+                <th>نام</th>
+                <th>قیمت</th>
+                <th>نقدینگی ($)</th>
+                <th>تعداد توکن‌های سازنده</th>
+                <th>قفل بودن نقدینگی</th>
+                <th>امتیاز اجتماعی</th>
+                <th>تغییر قیمت ۵ دقیقه‌ای</th>
+                <th>واچ‌لیست</th>
+                <th>افزودن</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for token in tokens %}
+            <tr>
+                <td>{{ token.name }}</td>
+                <td>{{ token.price }}</td>
+                <td>{{ token.liquidity_usd }}</td>
+                <td>{{ token.creator_token_count }}</td>
+                <td>{{ token.liquidity_locked }}</td>
+                <td>{{ token.social_score }}</td>
+                <td>{{ token.price_change_5m }}%</td>
+                <td>{{ token.watchlist_count }}</td>
+                <td>
+                    <form action="/watch" method="post">
+                        <input type="hidden" name="token_address" value="{{ token.address }}">
+                        <button class="btn" type="submit" {% if token.address in watchlist %}disabled{% endif %}>
+                            {% if token.address in watchlist %}در واچ‌لیست{% else %}افزودن{% endif %}
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>

@@ -2,63 +2,21 @@
 <html lang="fa">
 <head>
     <meta charset="UTF-8">
-    <title>مدیریت فیلترها</title>
-    <style>
-        body {
-            font-family: Tahoma, sans-serif;
-            background-color: #f4f4f4;
-            padding: 30px;
-            color: #333;
-        }
-        h1 {
-            text-align: center;
-        }
-        form {
-            max-width: 500px;
-            margin: auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-        }
-        label {
-            display: block;
-            margin-top: 15px;
-        }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin-top: 5px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
-        button {
-            margin-top: 20px;
-            padding: 10px 16px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        a {
-            display: block;
-            text-align: center;
-            margin-top: 20px;
-            text-decoration: none;
-            color: #555;
-        }
-    </style>
+    <title>ویرایش فیلترها</title>
 </head>
 <body>
-    <h1>مدیریت فیلترها</h1>
+    <h1>ویرایش فیلترها</h1>
     <form method="POST">
-        {% for key, value in filters.items() %}
-            <label for="{{ key }}">{{ key }}</label>
-            <input type="text" id="{{ key }}" name="{{ key }}" value="{{ value }}">
-        {% endfor %}
-        <button type="submit">💾 ذخیره تغییرات</button>
+        <label>حداقل نقدینگی (USD): <input type="number" name="min_liquidity_usd" value="{{ filters.min_liquidity_usd }}"></label><br>
+        <label>حداکثر تعداد توکن‌های سازنده: <input type="number" name="max_mint_count" value="{{ filters.max_mint_count }}"></label><br>
+        <label>حداقل امتیاز اجتماعی: <input type="number" name="min_social_score" value="{{ filters.min_social_score }}"></label><br>
+        <label>حداقل تعداد واچ‌لیست: <input type="number" name="min_watchlist_count" value="{{ filters.min_watchlist_count }}"></label><br>
+        <label>حداکثر نسبت نقدینگی به مارکت‌کپ: <input type="number" step="0.01" name="max_liquidity_to_marketcap_ratio" value="{{ filters.max_liquidity_to_marketcap_ratio }}"></label><br>
+        <label>حد آستانه تغییر قیمت ۵ دقیقه‌ای (%): <input type="number" step="0.01" name="price_change_5m_threshold" value="{{ filters.price_change_5m_threshold }}"></label><br>
+        <label>حداقل حجم ۲۴ ساعته (USD): <input type="number" name="min_volume_24h" value="{{ filters.min_volume_24h }}"></label><br>
+        <label>آیا قفل نقدینگی الزامی است؟ <input type="checkbox" name="lock_liquidity_required" {% if filters.lock_liquidity_required %}checked{% endif %}></label><br>
+        <label>حداکثر توکن‌های ساخته‌شده توسط سازنده: <input type="number" name="creator_min_tokens" value="{{ filters.creator_min_tokens }}"></label><br>
+        <button type="submit">ذخیره فیلترها</button>
     </form>
-    <a href="/">⬅ بازگشت به داشبورد</a>
 </body>
 </html>
