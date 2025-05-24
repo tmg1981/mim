@@ -107,4 +107,5 @@ def edit_filters():
     return "<h3>🛠 صفحه ویرایش فیلترها در حال توسعه است.</h3>"
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
