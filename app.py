@@ -1,120 +1,129 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash
 import json
 import os
-import datetime
-import pytz
-import telegram
+import requests
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'  # برای flash پیام‌ها
 
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '')
-CHAT_ID = os.environ.get('CHAT_ID', '')
-
-bot = telegram.Bot(token=TELEGRAM_TOKEN)
-
-TOKENS_FILE = 'tokens.json'
 WATCHLIST_FILE = 'watchlist.json'
-FILTERS_FILE = 'filters.json'
+TOKENS_FILE = 'tokens.json'
 
+# توکن تلگرام و چت آی‌دی (جایگزین کن با مقادیر خودت)
+TELEGRAM_TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN'
+TELEGRAM_CHAT_ID = 'YOUR_TELEGRAM_CHAT_ID'
 
-def load_json(file_path):
-    if not os.path.exists(file_path):
-        return [] if file_path.endswith('.json') else {}
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def load_tokens():
+    if os.path.exists(TOKENS_FILE):
+        with open(TOKENS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return []
 
-def save_json(file_path, data):
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+def load_watchlist():
+    if os.path.exists(WATCHLIST_FILE):
+        with open(WATCHLIST_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return []
 
+def save_watchlist(watchlist):
+    with open(WATCHLIST_FILE, 'w', encoding='utf-8') as f:
+        json.dump(watchlist, f, ensure_ascii=False, indent=2)
 
-def try_parse_number(value):
+def send_telegram_message(text):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        'chat_id': TELEGRAM_CHAT_ID,
+        'text': text,
+        'parse_mode': 'HTML'
+    }
     try:
-        return float(value)
-    except (ValueError, TypeError):
-        return 0.0
-
-
-def send_telegram_message(message):
-    if TELEGRAM_TOKEN and CHAT_ID:
-        try:
-            bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=telegram.constants.ParseMode.HTML)
-        except Exception as e:
-            print(f"Telegram Error: {e}")
-
-
-def send_watchlist_to_telegram(watchlist):
-    if not (TELEGRAM_TOKEN and CHAT_ID):
-        return
-    message = "📋 <b>واچ‌لیست امروز:</b>\n"
-    for i, token in enumerate(watchlist, 1):
-        message += f"{i}. {token['token_name']} ({token['token_symbol']}) - قیمت: ${token['price_usd']}\n"
-    try:
-        chat = bot.get_chat(CHAT_ID)
-        # Unpin all pinned messages first
-        pinned_msgs = chat.get_pinned_messages()
-        for msg in pinned_msgs:
-            bot.unpin_chat_message(CHAT_ID, msg.message_id)
-        sent = bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=telegram.constants.ParseMode.HTML)
-        bot.pin_chat_message(chat_id=CHAT_ID, message_id=sent.message_id)
+        r = requests.post(url, data=payload)
+        r.raise_for_status()
     except Exception as e:
-        print(f"Pin Telegram Error: {e}")
+        print("Telegram send error:", e)
 
+# فرض می‌کنیم این توابع برای خرید و فروش خودکار پیاده‌سازی شده
+def buy_token(token):
+    # اینجا منطق خرید خودکار را پیاده‌سازی کن
+    print(f"Buying token: {token['token_symbol']} at {token['price_usd']}")
+    # در واقعیت، درخواست به شبکه بلاک‌چین یا API صرافی ارسال شود
+
+def sell_token(token):
+    # اینجا منطق فروش خودکار را پیاده‌سازی کن
+    print(f"Selling token: {token['token_symbol']} at {token['price_usd']}")
+
+def calculate_risk_class(risk_level):
+    # برای استایل کلاس ریسک در HTML
+    level = risk_level.lower()
+    if level == 'low':
+        return 'risk-low'
+    elif level == 'medium':
+        return 'risk-medium'
+    elif level == 'high':
+        return 'risk-high'
+    else:
+        return ''
 
 @app.route('/')
 def index():
-    tokens = load_json(TOKENS_FILE)
-    watchlist = load_json(WATCHLIST_FILE)
-    watchlist_addresses = [t['address'] for t in watchlist]
-
-    # زمان را با timezone تهران تنظیم می‌کنیم
-    tz = pytz.timezone('Asia/Tehran')
-    now = datetime.datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
-
-    return render_template('index.html', tokens=tokens, watchlist=watchlist_addresses, now=now)
-
-
-@app.route('/add_to_watchlist/<address>')
-def add_to_watchlist(address):
-    tokens = load_json(TOKENS_FILE)
-    watchlist = load_json(WATCHLIST_FILE)
-    token = next((t for t in tokens if t['address'] == address), None)
-    if token and address not in [t['address'] for t in watchlist]:
-        watchlist.append(token)
-        save_json(WATCHLIST_FILE, watchlist)
-        send_telegram_message(f"➕ توکن <b>{token['token_name']}</b> به واچ‌لیست افزوده شد.")
-        send_watchlist_to_telegram(watchlist)
-    return redirect(url_for('index'))
-
-
-@app.route('/remove_from_watchlist/<address>')
-def remove_from_watchlist(address):
-    watchlist = load_json(WATCHLIST_FILE)
-    new_watchlist = [t for t in watchlist if t['address'] != address]
-    save_json(WATCHLIST_FILE, new_watchlist)
-    send_telegram_message(f"❌ توکن با آدرس <code>{address}</code> از واچ‌لیست حذف شد.")
-    send_watchlist_to_telegram(new_watchlist)
-    return redirect(url_for('index'))
-
+    tokens = load_tokens()
+    watchlist = load_watchlist()
+    # افزودن فیلدهای اضافی برای نمایش در قالب (مثل buy_price_usd)
+    # در اینجا فرض می‌کنیم buy_price_usd داخل واچ‌لیست ذخیره شده
+    for token in tokens:
+        # پیدا کردن اگر توکن در واچ‌لیست است
+        wtoken = next((w for w in watchlist if w['address'] == token['address']), None)
+        if wtoken:
+            token['buy_price_usd'] = wtoken.get('buy_price_usd', None)
+        else:
+            token['buy_price_usd'] = None
+        token['risk_class'] = calculate_risk_class(token.get('risk_level', ''))
+    return render_template('index.html', tokens=tokens)
 
 @app.route('/watchlist')
-def watchlist():
-    tokens = load_json(WATCHLIST_FILE)
-    tz = pytz.timezone('Asia/Tehran')
-    now = datetime.datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
-    return render_template('watchlist.html', tokens=tokens, watchlist=[t['address'] for t in tokens], now=now)
+def watchlist_page():
+    watchlist = load_watchlist()
+    for token in watchlist:
+        token['risk_class'] = calculate_risk_class(token.get('risk_level', ''))
+    return render_template('watchlist.html', tokens=watchlist)
 
-
-@app.route('/filters', methods=['GET', 'POST'])
-def filters():
-    if request.method == 'POST':
-        new_filters = request.form.to_dict()
-        save_json(FILTERS_FILE, new_filters)
+@app.route('/add_to_watchlist', methods=['POST'])
+def add_to_watchlist():
+    address = request.form.get('address')
+    tokens = load_tokens()
+    watchlist = load_watchlist()
+    token = next((t for t in tokens if t['address'] == address), None)
+    if not token:
+        flash('توکن یافت نشد!', 'danger')
         return redirect(url_for('index'))
-    filters_data = load_json(FILTERS_FILE)
-    return render_template('filters.html', filters=filters_data)
+    # چک کن اگر قبلاً در واچ‌لیست هست
+    if any(w['address'] == address for w in watchlist):
+        flash('توکن قبلاً در واچ‌لیست است.', 'warning')
+        return redirect(url_for('index'))
+    # اضافه کن و قیمت خرید فرضی را روی قیمت فعلی قرار بده
+    token_to_add = token.copy()
+    token_to_add['buy_price_usd'] = token['price_usd']
+    watchlist.append(token_to_add)
+    save_watchlist(watchlist)
+    buy_token(token_to_add)  # خرید خودکار
+    send_telegram_message(f"✅ توکن <b>{token['token_name']} ({token['token_symbol']})</b> به واچ‌لیست اضافه شد و خرید خودکار انجام شد.")
+    flash('توکن به واچ‌لیست اضافه شد.', 'success')
+    return redirect(url_for('index'))
 
+@app.route('/remove_from_watchlist', methods=['POST'])
+def remove_from_watchlist():
+    address = request.form.get('address')
+    watchlist = load_watchlist()
+    token = next((w for w in watchlist if w['address'] == address), None)
+    if not token:
+        flash('توکن در واچ‌لیست یافت نشد.', 'danger')
+        return redirect(url_for('watchlist_page'))
+    watchlist = [w for w in watchlist if w['address'] != address]
+    save_watchlist(watchlist)
+    sell_token(token)  # فروش خودکار
+    send_telegram_message(f"❌ توکن <b>{token['token_name']} ({token['token_symbol']})</b> از واچ‌لیست حذف شد و فروش خودکار انجام شد.")
+    flash('توکن از واچ‌لیست حذف شد.', 'success')
+    return redirect(url_for('watchlist_page'))
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=8000, debug=True)

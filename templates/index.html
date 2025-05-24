@@ -1,71 +1,74 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>صفحه اصلی</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+  <meta charset="UTF-8" />
+  <title>میم‌کوین‌شناس</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" crossorigin="anonymous" />
+  <style>
+    body { background-color: #f8f9fa; font-family: Vazirmatn, sans-serif; direction: rtl; }
+    .container { margin-top: 40px; }
+    .card { margin-bottom: 20px; }
+    .risk-low { color: green; }
+    .risk-medium { color: orange; }
+    .risk-high { color: red; }
+  </style>
 </head>
-<body class="bg-light">
-
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+<body>
   <div class="container">
-    <a class="navbar-brand" href="{{ url_for('index') }}">میم‌کوین‌شناس</a>
-    <div>
-      <a href="{{ url_for('watchlist') }}" class="btn btn-outline-light">مشاهده واچ‌لیست</a>
-      <a href="{{ url_for('filters') }}" class="btn btn-outline-light ms-2">تغییر فیلترها</a>
+    <h1 class="text-center mb-4">📊 داشبورد میم‌کوین‌شناس</h1>
+
+    <div class="d-flex justify-content-center mb-4">
+      <a href="/edit_filters" class="btn btn-outline-primary mx-2">⚙️ تغییر فیلترها</a>
+      <a href="/watchlist" class="btn btn-outline-success mx-2">⭐ مشاهده واچ‌لیست</a>
     </div>
-  </div>
-</nav>
 
-<div class="container">
-    <p class="text-muted mb-3">تاریخ بروزرسانی: {{ now }}</p>
-
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+    {% if tokens %}
       {% for token in tokens %}
-      <div class="col">
-        <div class="card h-100 shadow-sm">
+        <div class="card shadow">
           <div class="card-body">
             <h5 class="card-title">{{ token.token_name }} ({{ token.token_symbol }})</h5>
             <p class="card-text">
-              <b>قیمت فعلی:</b> ${{ token.price_usd }} <br />
-              <b>قیمت خرید:</b> ${{ token.buy_price_usd }} <br />
-              <b>نقدینگی:</b> ${{ token.liquidity | int }} <br />
-              <b>مارکت کپ:</b> ${{ token.market_cap | int }} <br />
-              <b>تغییر ۵ دقیقه:</b>
-              {% if token.price_change_5m >= 0 %}
-                <span class="text-success">+{{ token.price_change_5m }}%</span>
+              <strong>🧬 آدرس:</strong> 
+              <a href="https://etherscan.io/token/{{ token.address }}" target="_blank">{{ token.address }}</a><br />
+              <strong>💰 قیمت:</strong> ${{ token.price_usd }}<br />
+              <strong>📈 نقدینگی:</strong> ${{ token.liquidity }}<br />
+              <strong>📊 مارکت‌کپ:</strong> ${{ token.market_cap }}<br />
+              <strong>🔁 تغییر ۵ دقیقه‌ای:</strong> {{ token.price_change_5m }}٪<br />
+              <strong>📉 سود/زیان:</strong>
+              {% if token.buy_price_usd %}
+                {% set profit = ((token.price_usd - token.buy_price_usd) / token.buy_price_usd * 100) | round(2) %}
+                <span style="color: {{ 'green' if profit >= 0 else 'red' }}">{{ profit }}٪</span>
               {% else %}
-                <span class="text-danger">{{ token.price_change_5m }}%</span>
+                <em>--</em>
               {% endif %}
               <br />
-              <b>وضعیت ریسک:</b>
-              {% if token.risk_level == 'low' %}
-                <span class="badge bg-success">کم</span>
-              {% elif token.risk_level == 'medium' %}
-                <span class="badge bg-warning text-dark">متوسط</span>
-              {% elif token.risk_level == 'high' %}
-                <span class="badge bg-danger">زیاد</span>
-              {% else %}
-                <span class="badge bg-secondary">نامشخص</span>
-              {% endif %}
+              <strong>📉 سطح ریسک:</strong> 
+              <span class="{{ token.risk_class }}">
+                {{ token.risk_level }}
+              </span><br />
+              <strong>📊 نمودار قیمت:</strong>
+              <a href="{{ token.chart_url }}" target="_blank">مشاهده نمودار</a>
             </p>
 
-            <a href="{{ token.chart_url }}" target="_blank" class="btn btn-sm btn-info mb-2">مشاهده نمودار</a>
-
-            {% if token.address in watchlist %}
-              <a href="{{ url_for('remove_from_watchlist', address=token.address) }}" class="btn btn-sm btn-danger">حذف از واچ‌لیست</a>
-            {% else %}
-              <a href="{{ url_for('add_to_watchlist', address=token.address) }}" class="btn btn-sm btn-success">افزودن به واچ‌لیست</a>
-            {% endif %}
+            <form action="/add_to_watchlist" method="post" class="d-inline">
+              <input type="hidden" name="address" value="{{ token.address }}" />
+              <button type="submit" class="btn btn-success">➕ افزودن به واچ‌لیست</button>
+            </form>
+            <form action="/remove_from_watchlist" method="post" class="d-inline">
+              <input type="hidden" name="address" value="{{ token.address }}" />
+              <button type="submit" class="btn btn-danger">➖ حذف از واچ‌لیست</button>
+            </form>
           </div>
         </div>
-      </div>
-      {% else %}
-        <p>توکنی برای نمایش موجود نیست.</p>
       {% endfor %}
-    </div>
-</div>
+    {% else %}
+      <div class="alert alert-warning text-center">
+        هیچ توکنی برای نمایش وجود ندارد.
+      </div>
+    {% endif %}
+  </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 </body>
 </html>
