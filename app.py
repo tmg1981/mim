@@ -1,99 +1,118 @@
-import os
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import json
-import telegram
-from flask import Flask, render_template, request, redirect
+import os
 from datetime import datetime
-from dotenv import load_dotenv
+import pytz
+import telegram
 
-load_dotenv()
-
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-bot = telegram.Bot(token=TELEGRAM_TOKEN)
+# تابع کمکی برای تبدیل رشته به عدد، بولین یا نگه داشتن به‌صورت رشته
+def try_parse_number(value):
+    try:
+        if '.' in value:
+            return float(value)
+        return int(value)
+    except ValueError:
+        if value.lower() == 'true':
+            return True
+        if value.lower() == 'false':
+            return False
+        return value
 
 app = Flask(__name__)
-TOKENS_FILE = 'tokens.json'
-WATCHLIST_FILE = 'watchlist.json'
 
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+PORT = int(os.environ.get("PORT", 5000))
+
+bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
 def load_tokens():
-    if os.path.exists(TOKENS_FILE):
-        with open(TOKENS_FILE) as f:
+    try:
+        with open("tokens.json", "r") as f:
             return json.load(f)
-    return []
+    except:
+        return []
+
+def save_tokens(tokens):
+    with open("tokens.json", "w") as f:
+        json.dump(tokens, f, indent=4)
 
 def load_watchlist():
-    if os.path.exists(WATCHLIST_FILE):
-        with open(WATCHLIST_FILE) as f:
-            return json.load(f)
-    return []
-
-def save_watchlist(data):
-    with open(WATCHLIST_FILE, 'w') as f:
-        json.dump(data, f, indent=4)
-
-def format_token_summary(tokens):
-    summary = "📌 واچ‌لیست روزانه:\n"
-    for token in tokens:
-        name = token.get("token_name", "Unknown")
-        symbol = token.get("token_symbol", "")
-        price = token.get("price_usd", 0)
-        change = token.get("price_change_5m", 0)
-        pnl = f"{change:+.2f}%"
-        emoji = "🟢" if change >= 0 else "🔴"
-        summary += f"{emoji} {name} ({symbol}) | قیمت: ${price} | سود/زیان ۵دقیقه‌ای: {pnl}\n"
-    return summary
-
-def send_watchlist_to_telegram(tokens):
     try:
-        summary = format_token_summary(tokens)
-        messages = bot.get_chat(TELEGRAM_CHAT_ID).get_pinned_message()
-        if messages:
-            bot.unpin_chat_message(TELEGRAM_CHAT_ID, messages.message_id)
-        msg = bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=summary)
-        bot.pin_chat_message(chat_id=TELEGRAM_CHAT_ID, message_id=msg.message_id)
-    except Exception as e:
-        print(f"خطا در ارسال پیام تلگرام: {e}")
+        with open("watchlist.json", "r") as f:
+            return json.load(f)
+    except:
+        return []
 
-@app.route('/')
+def save_watchlist(watchlist):
+    with open("watchlist.json", "w") as f:
+        json.dump(watchlist, f, indent=4)
+
+def send_watchlist_to_telegram():
+    watchlist = load_watchlist()
+    if not watchlist:
+        message = "📋 واچ‌لیست امروز:
+(خالی است)"
+    else:
+        message = "📋 واچ‌لیست امروز:
+"
+        for token in watchlist:
+            change = token.get("price_change_5m", 0)
+            sign = "🔺" if change > 0 else ("🔻" if change < 0 else "➖")
+            message += f"{sign} {token['token_name']} ({token['token_symbol']}): {change}%\n"
+
+    msg = bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode=telegram.constants.ParseMode.HTML)
+    try:
+        bot.pin_chat_message(chat_id=TELEGRAM_CHAT_ID, message_id=msg.message_id, disable_notification=True)
+    except:
+        pass
+
+@app.route("/")
 def index():
     tokens = load_tokens()
-    watchlist = load_watchlist()
-    for token in tokens:
-        token['in_watchlist'] = any(w['address'] == token['address'] for w in watchlist)
-    return render_template('index.html', tokens=tokens, last_updated=datetime.now())
+    tehran_time = datetime.now(pytz.timezone('Asia/Tehran')).strftime("%Y-%m-%d %H:%M:%S")
+    return render_template("index.html", tokens=tokens, updated=tehran_time)
 
-@app.route('/add_to_watchlist', methods=['POST'])
+@app.route("/watchlist")
+def watchlist():
+    watchlist = load_watchlist()
+    return render_template("watchlist.html", watchlist=watchlist)
+
+@app.route("/add_to_watchlist", methods=["POST"])
 def add_to_watchlist():
-    address = request.form['address']
+    address = request.form.get("address")
     tokens = load_tokens()
-    token = next((t for t in tokens if t['address'] == address), None)
+    token = next((t for t in tokens if t["address"] == address), None)
     if token:
         watchlist = load_watchlist()
-        if all(w['address'] != address for w in watchlist):
+        if address not in [t["address"] for t in watchlist]:
             watchlist.append(token)
             save_watchlist(watchlist)
-            send_watchlist_to_telegram(watchlist)
-    return redirect('/')
+            send_watchlist_to_telegram()
+    return redirect(url_for("index"))
 
-@app.route('/remove_from_watchlist', methods=['POST'])
+@app.route("/remove_from_watchlist", methods=["POST"])
 def remove_from_watchlist():
-    address = request.form['address']
+    address = request.form.get("address")
     watchlist = load_watchlist()
-    new_watchlist = [w for w in watchlist if w['address'] != address]
-    save_watchlist(new_watchlist)
-    send_watchlist_to_telegram(new_watchlist)
+    watchlist = [t for t in watchlist if t["address"] != address]
+    save_watchlist(watchlist)
+    send_watchlist_to_telegram()
+    return redirect(url_for("watchlist"))
+
+@app.route('/filters', methods=['GET'])
+def filters():
+    with open('filters.json', 'r') as f:
+        filters_data = json.load(f)
+    return render_template('filters.html', filters=filters_data)
+
+@app.route('/update_filters', methods=['POST'])
+def update_filters():
+    new_filters = {key: try_parse_number(value) for key, value in request.form.items()}
+    with open('filters.json', 'w') as f:
+        json.dump(new_filters, f, indent=4)
     return redirect('/')
 
-@app.route('/watchlist')
-def watchlist():
-    tokens = load_watchlist()
-    return render_template('watchlist.html', tokens=tokens)
 
-@app.route('/change_filters')
-def change_filters():
-    return "<h3>صفحه ویرایش فیلترها در حال توسعه است.</h3>"
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=PORT)
