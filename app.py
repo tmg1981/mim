@@ -13,7 +13,7 @@ TOKENS_FILE = 'tokens.json'
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-bot = telegram.Bot(token=TELEGRAM_TOKEN)
+
 
 def load_tokens():
     if os.path.exists(TOKENS_FILE):
