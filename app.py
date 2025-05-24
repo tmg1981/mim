@@ -6,10 +6,13 @@ import telegram
 
 app = Flask(__name__)
 
+# دریافت توکن و چت آی‌دی از متغیرهای محیطی (Render هم باید اینها رو تعریف کنه)
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '')
 CHAT_ID = os.environ.get('CHAT_ID', '')
 
-bot = telegram.Bot(token=TELEGRAM_TOKEN)
+bot = None
+if TELEGRAM_TOKEN:
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
 TOKENS_FILE = 'tokens.json'
 WATCHLIST_FILE = 'watchlist.json'
@@ -18,13 +21,14 @@ FILTERS_FILE = 'filters.json'
 
 def load_json(file_path):
     if not os.path.exists(file_path):
+        # برای فایل‌های لیستی خالی برگردون، برای فیلترها که دیکشنری هستند {}
         return [] if file_path.endswith('.json') else {}
-    with open(file_path, 'r') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def save_json(file_path, data):
-    with open(file_path, 'w') as f:
-        json.dump(data, f, indent=2)
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 def try_parse_number(value):
@@ -35,7 +39,7 @@ def try_parse_number(value):
 
 
 def send_telegram_message(message):
-    if TELEGRAM_TOKEN and CHAT_ID:
+    if bot and CHAT_ID:
         try:
             bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=telegram.constants.ParseMode.HTML)
         except Exception as e:
@@ -43,17 +47,20 @@ def send_telegram_message(message):
 
 
 def send_watchlist_to_telegram(watchlist):
+    if not bot or not CHAT_ID:
+        return
     message = "📋 واچ‌لیست امروز:\n"
     for i, token in enumerate(watchlist, 1):
         message += f"{i}. {token['token_name']} ({token['token_symbol']})\n"
-    if TELEGRAM_TOKEN and CHAT_ID:
-        try:
-            for msg in bot.get_chat(CHAT_ID).get_pinned_messages():
-                bot.unpin_chat_message(CHAT_ID, msg.message_id)
-            sent = bot.send_message(chat_id=CHAT_ID, text=message)
-            bot.pin_chat_message(chat_id=CHAT_ID, message_id=sent.message_id)
-        except Exception as e:
-            print(f"Pin Telegram Error: {e}")
+    try:
+        # باز کردن چت و پین کردن پیام (قبلش پیام‌های پین‌شده را آن‌پین می‌کنیم)
+        pinned_msgs = bot.get_chat(CHAT_ID).pinned_message
+        if pinned_msgs:
+            bot.unpin_chat_message(CHAT_ID)
+        sent = bot.send_message(chat_id=CHAT_ID, text=message)
+        bot.pin_chat_message(chat_id=CHAT_ID, message_id=sent.message_id)
+    except Exception as e:
+        print(f"Pin Telegram Error: {e}")
 
 
 @app.route('/')
@@ -106,4 +113,5 @@ def filters():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
+    # بسیار مهم: host=0.0.0.0 تا Render بتونه به اپ دسترسی داشته باشه
     app.run(debug=True, host='0.0.0.0', port=port)
