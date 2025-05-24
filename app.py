@@ -51,10 +51,10 @@ def save_watchlist(watchlist):
 def send_watchlist_to_telegram():
     watchlist = load_watchlist()
     if not watchlist:
-        message = "📋 واچ‌لیست امروز:
+        message = """📋 واچ‌لیست امروز:
 (خالی است)"
     else:
-        message = "📋 واچ‌لیست امروز:
+        message = """📋 واچ‌لیست امروز:
 "
         for token in watchlist:
             change = token.get("price_change_5m", 0)
