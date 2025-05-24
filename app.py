@@ -10,10 +10,14 @@ TOKENS_FILE = 'tokens.json'
 WATCHLIST_FILE = 'watchlist.json'
 
 def load_tokens():
+    if not os.path.exists(TOKENS_FILE):
+        return []
     with open(TOKENS_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def load_filters():
+    if not os.path.exists(FILTERS_FILE):
+        return {}
     with open(FILTERS_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
@@ -32,6 +36,7 @@ def index():
     filters = load_filters()
     tokens = load_tokens()
     watchlist = load_watchlist()
+
     filtered_tokens = []
     for token in tokens:
         try:
@@ -50,27 +55,33 @@ def index():
         except Exception as e:
             print(f"Error filtering token: {token.get('name')} - {e}")
             continue
-        if not filtered_tokens:
-    test_token = {
-        "name": "TestToken",
-        "symbol": "TTK",
-        "address": "0xTestAddress000000000000000000000000",
-        "liquidity_usd": 100000,
-        "mint_count": 1,
-        "social_score": 1000,
-        "watchlist_count": 200,
-        "liquidity_to_mc": 0.2,
-        "price_change_5m": 1.5,
-        "volume_24h": 10000,
-        "liquidity_locked": "قفل",
-        "creator_token_count": 1,
-        "chart_url": "https://dexscreener.com/chart/testtoken",
-        "risk_level": "low"
-    }
-    filtered_tokens.append(test_token)
 
-    return render_template('index.html', tokens=filtered_tokens, watchlist=watchlist,
-                           last_updated=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    # اگر توکنی برای نمایش نبود، یک توکن تستی اضافه شود
+    if not filtered_tokens:
+        test_token = {
+            "name": "توکن تستی",
+            "symbol": "TST",
+            "address": "0xTestTokenAddress",
+            "chart_url": "https://dexscreener.com/",
+            "liquidity_usd": 100000,
+            "mint_count": 1,
+            "social_score": 50,
+            "price_change_5m": 0.5,
+            "liquidity_locked": "قفل",
+            "creator_token_count": 1,
+            "volume_24h": 10000,
+            "watchlist_count": 0,
+            "liquidity_to_mc": 0.5,
+            "risk_level": "low"
+        }
+        filtered_tokens = [test_token]
+
+    return render_template(
+        'index.html',
+        tokens=filtered_tokens,
+        watchlist=watchlist,
+        last_updated=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    )
 
 @app.route('/watch', methods=['POST'])
 def add_to_watchlist():
@@ -78,6 +89,17 @@ def add_to_watchlist():
     watchlist = load_watchlist()
     if address not in watchlist:
         watchlist.append(address)
+        # اینجا می‌تونی کد خرید خودکار رو اضافه کنی
+    save_watchlist(watchlist)
+    return redirect('/')
+
+@app.route('/unwatch', methods=['POST'])
+def remove_from_watchlist():
+    address = request.form['token_address']
+    watchlist = load_watchlist()
+    if address in watchlist:
+        watchlist.remove(address)
+        # اینجا می‌تونی کد فروش خودکار رو اضافه کنی
     save_watchlist(watchlist)
     return redirect('/')
 
