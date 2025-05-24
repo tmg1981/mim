@@ -1,0 +1,11 @@
+{
+  "min_liquidity_usd": 90000,
+  "max_mint_count": 2,
+  "min_social_score": 50,
+  "min_watchlist_count": 30,
+  "max_liquidity_to_marketcap_ratio": 1,
+  "price_change_5m_threshold": 0.5,
+  "min_volume_24h": 10000,
+  "lock_liquidity_required": true,
+  "creator_min_tokens": 3
+}

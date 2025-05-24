@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>میم‌کوین‌های مستعد</title>
+    <style>
+        body {
+            font-family: Vazirmatn, sans-serif;
+            direction: rtl;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .top-bar a {
+            text-decoration: none;
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background-color: #eee;
+        }
+        .btn {
+            padding: 6px 10px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn:disabled {
+            background-color: #aaa;
+            cursor: default;
+        }
+    </style>
+</head>
+<body>
+    <h1>میم‌کوین‌های مستعد</h1>
+
+    <div class="top-bar">
+        <div>آخرین به‌روزرسانی: {{ last_updated }}</div>
+        <div><a href="/edit_filters">ویرایش فیلترها</a></div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>نام</th>
+                <th>قیمت</th>
+                <th>نقدینگی ($)</th>
+                <th>تعداد توکن‌های سازنده</th>
+                <th>قفل بودن نقدینگی</th>
+                <th>امتیاز اجتماعی</th>
+                <th>تغییر قیمت ۵ دقیقه‌ای</th>
+                <th>واچ‌لیست</th>
+                <th>افزودن</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for token in tokens %}
+            <tr>
+                <td>{{ token.name }}</td>
+                <td>{{ token.price }}</td>
+                <td>{{ token.liquidity_usd }}</td>
+                <td>{{ token.creator_token_count }}</td>
+                <td>{{ token.liquidity_locked }}</td>
+                <td>{{ token.social_score }}</td>
+                <td>{{ token.price_change_5m }}%</td>
+                <td>{{ token.watchlist_count }}</td>
+                <td>
+                    <form action="/watch" method="post">
+                        <input type="hidden" name="token_address" value="{{ token.address }}">
+                        <button class="btn" type="submit" {% if token.address in watchlist %}disabled{% endif %}>
+                            {% if token.address in watchlist %}در واچ‌لیست{% else %}افزودن{% endif %}
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
