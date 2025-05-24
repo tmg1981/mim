@@ -2,12 +2,27 @@ from flask import Flask, render_template, request, redirect
 import json
 from datetime import datetime
 import os
+import requests
 
 app = Flask(__name__)
 
 FILTERS_FILE = 'filters.json'
 TOKENS_FILE = 'tokens.json'
 WATCHLIST_FILE = 'watchlist.json'
+
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+
+def send_telegram_message(text):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("⚠️ توکن یا Chat ID تلگرام تنظیم نشده.")
+        return
+    url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
+    data = {'chat_id': TELEGRAM_CHAT_ID, 'text': text}
+    try:
+        requests.post(url, data=data)
+    except Exception as e:
+        print(f"خطا در ارسال پیام به تلگرام: {e}")
 
 def load_tokens():
     if not os.path.exists(TOKENS_FILE):
@@ -36,6 +51,7 @@ def index():
     filters = load_filters()
     tokens = load_tokens()
     watchlist = load_watchlist()
+    watchlist_addresses = [t.get('address') for t in watchlist]
 
     filtered_tokens = []
     for token in tokens:
@@ -56,7 +72,6 @@ def index():
             print(f"Error filtering token: {token.get('name')} - {e}")
             continue
 
-    # اگر توکنی برای نمایش نبود، یک توکن تستی اضافه شود
     if not filtered_tokens:
         test_token = {
             "name": "توکن تستی",
@@ -79,37 +94,38 @@ def index():
     return render_template(
         'index.html',
         tokens=filtered_tokens,
-        watchlist=watchlist,
+        watchlist=watchlist_addresses,
         last_updated=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     )
 
 @app.route('/watch', methods=['POST'])
 def add_to_watchlist():
     address = request.form['token_address']
+    tokens = load_tokens()
     watchlist = load_watchlist()
-    if address not in watchlist:
-        watchlist.append(address)
-        # اینجا می‌تونی کد خرید خودکار رو اضافه کنی
-    save_watchlist(watchlist)
+
+    existing_addresses = [t.get('address') for t in watchlist]
+    if address not in existing_addresses:
+        token = next((t for t in tokens if t.get('address') == address), None)
+        if token:
+            watchlist.append(token)
+            save_watchlist(watchlist)
+            send_telegram_message(f"✅ توکن {token['name']} ({token['symbol']}) به واچ‌لیست افزوده شد.")
     return redirect('/')
 
 @app.route('/unwatch', methods=['POST'])
 def remove_from_watchlist():
     address = request.form['token_address']
     watchlist = load_watchlist()
-    if address in watchlist:
-        watchlist.remove(address)
-        # اینجا می‌تونی کد فروش خودکار رو اضافه کنی
-    save_watchlist(watchlist)
+    new_watchlist = [t for t in watchlist if t.get('address') != address]
+    if len(new_watchlist) < len(watchlist):
+        save_watchlist(new_watchlist)
+        send_telegram_message(f"❌ توکن با آدرس {address} از واچ‌لیست حذف شد.")
     return redirect('/')
 
 @app.route('/watchlist')
 def view_watchlist():
-    watchlist = load_watchlist()
-    tokens = load_tokens()
-    watchlist_tokens = [t for t in tokens if t.get('address') in watchlist]
-    return render_template('watchlist.html', tokens=watchlist_tokens)
-
+    return render_template('watchlist.html', tokens=load_watchlist())
 
 @app.route('/edit_filters', methods=['GET', 'POST'])
 def edit_filters():
