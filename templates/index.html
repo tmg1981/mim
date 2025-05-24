@@ -78,17 +78,52 @@
             font-size: 0.9em;
             margin-right: 10px;
         }
+        /* دکمه‌های بالای صفحه */
+        .top-buttons {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .top-buttons a {
+            margin: 0 10px;
+            padding: 8px 16px;
+            border-radius: 5px;
+            text-decoration: none;
+            color: white;
+            font-weight: bold;
+        }
+        .watchlist-btn {
+            background-color: #28a745;
+        }
+        .filters-btn {
+            background-color: #ffc107;
+            color: black;
+        }
     </style>
 </head>
 <body>
     <h1>میم‌کوین‌شناس</h1>
+
+    <div class="top-buttons">
+        <a href="/watchlist" class="watchlist-btn">مشاهده واچ‌لیست</a>
+        <a href="/edit_filters" class="filters-btn">تغییر فیلترها</a>
+    </div>
+
     <div class="token-list">
         {% for token in tokens %}
         <div class="token-item">
             <div class="token-info">
                 <span class="token-name">{{ token.token_name }}</span>
                 <span class="token-symbol">({{ token.token_symbol }})</span>
-                <span class="token-price">قیمت: {{ token.price_usd }} $</span>
+                <br />
+                <span class="token-price">قیمت: {{ token.price_usd }} $</span> |
+                <span>حجم ۲۴ ساعته: {{ token.volume_24h if token.volume_24h else 'نامشخص' }}</span> |
+                <span>مارکت کپ: {{ token.market_cap if token.market_cap else 'نامشخص' }}</span> |
+                <span>تغییر ۵ دقیقه: {{ token.price_change_5m if token.price_change_5m else '0' }}%</span> |
+                <span>لیکوییدیتی: {{ token.liquidity if token.liquidity else 'نامشخص' }}</span>
+                {% if token.risk_level %}
+                | <span>ریسک: {{ token.risk_level }}</span>
+                {% endif %}
+                <br />
                 {% if token.address %}
                 <a class="chart-link" href="https://dexscreener.com/ethereum/{{ token.address }}" target="_blank" rel="noopener noreferrer">نمودار قیمت</a>
                 <span>آدرس: {{ token.address }}</span>
