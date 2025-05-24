@@ -1,22 +1,21 @@
-<!-- templates/filters.html -->
 <!DOCTYPE html>
-<html lang="fa">
+<html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>ویرایش فیلترها</title>
+    <title>تنظیم فیلترها</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 </head>
-<body class="bg-light p-4">
-    <div class="container">
-        <h2 class="mb-4 text-center">ویرایش فیلترها</h2>
-        <form method="POST" action="/update_filters">
+<body class="bg-light">
+    <div class="container mt-5">
+        <h2 class="mb-4">تنظیم فیلترها</h2>
+        <form method="POST" action="/filters">
             {% for key, value in filters.items() %}
-            <div class="mb-3">
-                <label for="{{ key }}" class="form-label">{{ key }}</label>
-                <input type="text" class="form-control" id="{{ key }}" name="{{ key }}" value="{{ value }}">
-            </div>
+                <div class="mb-3">
+                    <label class="form-label">{{ key }}</label>
+                    <input type="text" class="form-control" name="{{ key }}" value="{{ value }}">
+                </div>
             {% endfor %}
-            <button type="submit" class="btn btn-primary">ذخیره</button>
+            <button type="submit" class="btn btn-primary">ذخیره تغییرات</button>
             <a href="/" class="btn btn-secondary">بازگشت</a>
         </form>
     </div>
