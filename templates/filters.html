@@ -1,22 +1,65 @@
 <!DOCTYPE html>
-<html lang="fa">
+<html lang="fa" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <title>ویرایش فیلترها</title>
+  <meta charset="UTF-8">
+  <title>تنظیم فیلترها</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 </head>
-<body>
-    <h1>ویرایش فیلترها</h1>
-    <form method="POST">
-        <label>حداقل نقدینگی (USD): <input type="number" name="min_liquidity_usd" value="{{ filters.min_liquidity_usd }}"></label><br>
-        <label>حداکثر تعداد توکن‌های سازنده: <input type="number" name="max_mint_count" value="{{ filters.max_mint_count }}"></label><br>
-        <label>حداقل امتیاز اجتماعی: <input type="number" name="min_social_score" value="{{ filters.min_social_score }}"></label><br>
-        <label>حداقل تعداد واچ‌لیست: <input type="number" name="min_watchlist_count" value="{{ filters.min_watchlist_count }}"></label><br>
-        <label>حداکثر نسبت نقدینگی به مارکت‌کپ: <input type="number" step="0.01" name="max_liquidity_to_marketcap_ratio" value="{{ filters.max_liquidity_to_marketcap_ratio }}"></label><br>
-        <label>حد آستانه تغییر قیمت ۵ دقیقه‌ای (%): <input type="number" step="0.01" name="price_change_5m_threshold" value="{{ filters.price_change_5m_threshold }}"></label><br>
-        <label>حداقل حجم ۲۴ ساعته (USD): <input type="number" name="min_volume_24h" value="{{ filters.min_volume_24h }}"></label><br>
-        <label>آیا قفل نقدینگی الزامی است؟ <input type="checkbox" name="lock_liquidity_required" {% if filters.lock_liquidity_required %}checked{% endif %}></label><br>
-        <label>حداکثر توکن‌های ساخته‌شده توسط سازنده: <input type="number" name="creator_min_tokens" value="{{ filters.creator_min_tokens }}"></label><br>
-        <button type="submit">ذخیره فیلترها</button>
-    </form>
+<body class="container mt-5">
+  <h2 class="mb-4">⚙️ تنظیم فیلترها</h2>
+  <form method="POST" class="row g-3">
+
+    <div class="col-md-6">
+      <label class="form-label">💧 حداقل نقدینگی (USD)</label>
+      <input name="min_liquidity_usd" type="number" class="form-control" value="{{ filters.min_liquidity_usd }}">
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">🔢 حداکثر تعداد توکن‌های ساخته‌شده توسط سازنده</label>
+      <input name="max_mint_count" type="number" class="form-control" value="{{ filters.max_mint_count }}">
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">📣 حداقل امتیاز اجتماعی</label>
+      <input name="min_social_score" type="number" class="form-control" value="{{ filters.min_social_score }}">
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">📋 حداقل تعداد واچ‌لیست</label>
+      <input name="min_watchlist_count" type="number" class="form-control" value="{{ filters.min_watchlist_count }}">
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">📊 حداکثر نسبت نقدینگی به مارکت کپ</label>
+      <input name="max_liquidity_to_marketcap_ratio" type="number" step="0.01" class="form-control" value="{{ filters.max_liquidity_to_marketcap_ratio }}">
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">📈 آستانه تغییر قیمت ۵ دقیقه‌ای (%)</label>
+      <input name="price_change_5m_threshold" type="number" step="0.01" class="form-control" value="{{ filters.price_change_5m_threshold }}">
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">💸 حداقل حجم معاملات ۲۴ ساعته (USD)</label>
+      <input name="min_volume_24h" type="number" class="form-control" value="{{ filters.min_volume_24h }}">
+    </div>
+
+    <div class="col-md-6 mt-4">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="lock_liquidity_required" {% if filters.lock_liquidity_required %}checked{% endif %}>
+        <label class="form-check-label">🔒 فقط توکن‌های با نقدینگی قفل‌شده</label>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">🧑‍💼 حداکثر تعداد توکن‌های ساخته‌شده توسط سازنده</label>
+      <input name="creator_min_tokens" type="number" class="form-control" value="{{ filters.creator_min_tokens }}">
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-success">💾 ذخیره تغییرات</button>
+      <a href="/" class="btn btn-secondary ms-2">بازگشت</a>
+    </div>
+  </form>
 </body>
 </html>

@@ -103,6 +103,14 @@ def remove_from_watchlist():
     save_watchlist(watchlist)
     return redirect('/')
 
+@app.route('/watchlist')
+def view_watchlist():
+    watchlist = load_watchlist()
+    tokens = load_tokens()
+    watchlist_tokens = [t for t in tokens if t.get('address') in watchlist]
+    return render_template('watchlist.html', tokens=watchlist_tokens)
+
+
 @app.route('/edit_filters', methods=['GET', 'POST'])
 def edit_filters():
     if request.method == 'POST':

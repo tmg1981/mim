@@ -1,98 +1,33 @@
 <!DOCTYPE html>
-<html lang="fa">
+<html lang="fa" dir="rtl">
 <head>
-    <meta charset="UTF-8" />
-    <title>واچ‌لیست میم‌کوین‌ها</title>
-    <style>
-        body {
-            font-family: "Tahoma", sans-serif;
-            background-color: #fff;
-            padding: 30px;
-            color: #333;
-            direction: rtl;
-        }
-        .token {
-            border: 1px solid #ccc;
-            padding: 18px;
-            margin-bottom: 10px;
-            border-radius: 10px;
-            background: #f9f9f9;
-            box-shadow: 0 0 8px rgba(0,0,0,0.05);
-        }
-        button {
-            background-color: #dc3545;
-            color: white;
-            padding: 8px 12px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            float: left;
-            transition: background-color 0.3s ease;
-        }
-        button:hover {
-            background-color: #bd2130;
-        }
-        .back-link {
-            display: block;
-            margin-bottom: 20px;
-            font-size: 18px;
-            color: #007bff;
-            text-decoration: none;
-        }
-        .back-link:hover {
-            text-decoration: underline;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>واچ‌لیست شما</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 </head>
-<body>
-    <h1>واچ‌لیست میم‌کوین‌ها</h1>
-    <a href="{{ url_for('index') }}" class="back-link">🏠 بازگشت به صفحه اصلی</a>
+<body class="container mt-5">
+  <h2 class="mb-4">📋 واچ‌لیست</h2>
 
-    {% if tokens|length == 0 %}
-        <p>واچ‌لیست خالی است.</p>
-    {% else %}
-        {% for token in tokens %}
-        <div class="token">
-            <div><strong>نام:</strong> {{ token.name }}</div>
-            <div><strong>نماد:</strong> {{ token.symbol }}</div>
-            <div><strong>قیمت (USD):</strong> {{ "%.4f"|format(token.price_usd) }}</div>
-            <div><strong>نقدینگی (USD):</strong> {{ "%.0f"|format(token.liquidity_usd) }}</div>
-            <div><strong>مارکت کپ:</strong> {{ "%.0f"|format(token.market_cap) }}</div>
-            <div>
-                <a href="https://dexscreener.com/ethereum/{{ token.address }}" target="_blank">📈 نمودار قیمت</a>
+  {% if tokens %}
+    <div class="row">
+      {% for token in tokens %}
+        <div class="col-md-4 mb-3">
+          <div class="card border-primary shadow">
+            <div class="card-body">
+              <h5 class="card-title">{{ token.name }}</h5>
+              <p class="card-text"><strong>آدرس:</strong> {{ token.address }}</p>
+              <p class="card-text">
+                <a href="https://dexscreener.com/solana/{{ token.address }}" target="_blank" class="btn btn-sm btn-outline-secondary">📈 نمودار</a>
+              </p>
             </div>
-            <button onclick="removeFromWatchlist('{{ token.address }}', this)">حذف از واچ‌لیست</button>
-            <div style="clear: both;"></div>
+          </div>
         </div>
-        {% endfor %}
-    {% endif %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-warning">توکنی در واچ‌لیست شما وجود ندارد.</div>
+  {% endif %}
 
-<script>
-async function removeFromWatchlist(address, btn) {
-    btn.disabled = true;
-    btn.textContent = "در حال حذف...";
-    try {
-        const res = await fetch("/watchlist/remove", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({address: address})
-        });
-        const data = await res.json();
-        if (data.status === "ok") {
-            btn.parentElement.style.display = "none";
-        } else {
-            alert("خطا در حذف از واچ‌لیست: " + data.message);
-            btn.disabled = false;
-            btn.textContent = "حذف از واچ‌لیست";
-        }
-    } catch (err) {
-        alert("خطا در ارسال درخواست");
-        btn.disabled = false;
-        btn.textContent = "حذف از واچ‌لیست";
-    }
-}
-</script>
-
+  <a href="/" class="btn btn-secondary mt-4">بازگشت</a>
 </body>
 </html>
