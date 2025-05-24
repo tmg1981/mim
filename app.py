@@ -10,8 +10,10 @@ WATCHLIST_FILE = 'watchlist.json'
 TOKENS_FILE = 'tokens.json'
 
 # توکن تلگرام و چت آی‌دی (جایگزین کن با مقادیر خودت)
-TELEGRAM_TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN'
-TELEGRAM_CHAT_ID = 'YOUR_TELEGRAM_CHAT_ID'
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
 def load_tokens():
     if os.path.exists(TOKENS_FILE):
