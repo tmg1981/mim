@@ -3,3 +3,5 @@ requests
 python-dotenv
 gunicorn
 pytz
+python-telegram-bot==20.7
+
