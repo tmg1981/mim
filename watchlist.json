@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "token_name": "SampleCoin",
+    "token_symbol": "SMP",
+    "price_usd": 0.034,
+    "buy_price_usd": 0.034,
+    "liquidity": 90000,
+    "market_cap": 250000,
+    "price_change_5m": -5.2,
+    "address": "0xSampleTokenAddress",
+    "chart_url": "https://dexscreener.com",
+    "risk_level": "medium"
+  },
+  "0xSampleTokenAddress"
+]
