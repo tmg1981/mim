@@ -8,10 +8,10 @@ from telegram import Bot
 load_dotenv()
 
 app = Flask(__name__)
-TELEGRAM_TOKEN ="TELEGRAM_BOT_TOKEN"
-TELEGRAM_CHAT_ID = "TELEGRAM_CHAT_ID"
-#TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-#TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+#TELEGRAM_TOKEN ="TELEGRAM_BOT_TOKEN"
+#TELEGRAM_CHAT_ID = "TELEGRAM_CHAT_ID"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 #bot = Bot(token=TELEGRAM_TOKEN)
 
 def fetch_tokens():
@@ -144,5 +144,5 @@ def update_pinned_message(watchlist):
     except Exception as e:
         print("Pinned Message Error:", e)
 
-if __name__ == "__main__":
-    app.run(debug=True, port=int(os.environ.get("PORT", 5000)))
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000, debug=True)
